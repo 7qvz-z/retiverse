@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ARTIST_MAX_TRACKS,
   RANDOMNESS_STEP,
@@ -184,89 +184,53 @@ export function SettingsForm({ profile }: Props) {
           プレイリスト設定
         </h2>
 
-        <label className="block space-y-2">
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="text-sm font-medium">曲数</span>
-            <span className="text-sm text-[#1a1612]/55">
-              {preferences.trackCount} 曲
-            </span>
-          </div>
-          <input
-            type="range"
-            min={TRACK_COUNT.min}
-            max={TRACK_COUNT.max}
-            step={5}
-            value={preferences.trackCount}
-            onChange={(e) => {
-              setPreferences((prev) => ({
-                ...prev,
-                trackCount: Number(e.target.value),
-              }));
-              setMessage(null);
-            }}
-            className="w-full accent-[#2a6f6a]"
-          />
-          <div className="flex justify-between text-xs text-[#1a1612]/40">
-            <span>{TRACK_COUNT.min}</span>
-            <span>{TRACK_COUNT.max}</span>
-          </div>
-        </label>
+        <NumberField
+          label="曲数"
+          unit="曲"
+          min={TRACK_COUNT.min}
+          max={TRACK_COUNT.max}
+          step={1}
+          value={preferences.trackCount}
+          onChange={(value) => {
+            setPreferences((prev) => ({ ...prev, trackCount: value }));
+            setMessage(null);
+          }}
+        />
 
-        <label className="block space-y-2">
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="text-sm font-medium">アーティスト最大曲数</span>
-            <span className="text-sm text-[#1a1612]/55">
-              {preferences.maxTracksPerArtist} 曲
-            </span>
-          </div>
-          <input
-            type="range"
-            min={ARTIST_MAX_TRACKS.min}
-            max={ARTIST_MAX_TRACKS.max}
-            step={1}
-            value={preferences.maxTracksPerArtist}
-            onChange={(e) => {
-              setPreferences((prev) => ({
-                ...prev,
-                maxTracksPerArtist: Number(e.target.value),
-              }));
-              setMessage(null);
-            }}
-            className="w-full accent-[#2a6f6a]"
-          />
-          <div className="flex justify-between text-xs text-[#1a1612]/40">
-            <span>{ARTIST_MAX_TRACKS.min}</span>
-            <span>{ARTIST_MAX_TRACKS.max}</span>
-          </div>
-        </label>
+        <NumberField
+          label="アーティスト最大曲数"
+          unit="曲"
+          min={ARTIST_MAX_TRACKS.min}
+          max={ARTIST_MAX_TRACKS.max}
+          step={1}
+          value={preferences.maxTracksPerArtist}
+          onChange={(value) => {
+            setPreferences((prev) => ({
+              ...prev,
+              maxTracksPerArtist: value,
+            }));
+            setMessage(null);
+          }}
+        />
 
-        <label className="block space-y-2">
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="text-sm font-medium">ランダム性の強さ</span>
-            <span className="text-sm text-[#1a1612]/55">
-              {preferences.randomnessPercent}%
-            </span>
-          </div>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            step={RANDOMNESS_STEP}
-            value={preferences.randomnessPercent}
-            disabled={!preferences.randomnessEnabled}
-            onChange={(e) => {
-              setPreferences((prev) => ({
-                ...prev,
-                randomnessPercent: Number(e.target.value),
-              }));
-              setMessage(null);
-            }}
-            className="w-full accent-[#2a6f6a] disabled:opacity-40"
-          />
-          <p className="text-xs text-[#1a1612]/45">
-            「ランダム性」が OFF のときは並びのばらつきを抑えめにします。5%刻み。
-          </p>
-        </label>
+        <NumberField
+          label="ランダム性の強さ"
+          unit="%"
+          min={0}
+          max={100}
+          step={RANDOMNESS_STEP}
+          value={preferences.randomnessPercent}
+          disabled={!preferences.randomnessEnabled}
+          normalize={snapRandomness}
+          hint="「ランダム性」が OFF のときは並びのばらつきを抑えめにします。5%刻みで入力できます。"
+          onChange={(value) => {
+            setPreferences((prev) => ({
+              ...prev,
+              randomnessPercent: value,
+            }));
+            setMessage(null);
+          }}
+        />
       </section>
 
       {error ? (
@@ -292,6 +256,105 @@ export function SettingsForm({ profile }: Props) {
           ホームに戻る
         </Link>
       </div>
+    </div>
+  );
+}
+
+type NumberFieldProps = {
+  label: string;
+  unit: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  disabled?: boolean;
+  hint?: string;
+  normalize?: (n: number) => number;
+  onChange: (value: number) => void;
+};
+
+function NumberField({
+  label,
+  unit,
+  min,
+  max,
+  step,
+  value,
+  disabled = false,
+  hint,
+  normalize,
+  onChange,
+}: NumberFieldProps) {
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  function commit(raw: string) {
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) {
+      setDraft(String(value));
+      return;
+    }
+    const clamped = clamp(parsed, min, max);
+    const next = normalize ? normalize(clamped) : clamped;
+    setDraft(String(next));
+    onChange(next);
+  }
+
+  return (
+    <div className={`space-y-2 ${disabled ? "opacity-50" : ""}`}>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm font-medium">{label}</span>
+        <div className="flex items-center gap-1.5">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={min}
+            max={max}
+            step={step}
+            value={draft}
+            disabled={disabled}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={(e) => commit(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.currentTarget.blur();
+              }
+            }}
+            className="w-20 rounded-lg border border-[#1a1612]/15 bg-white px-2 py-1.5 text-right text-sm outline-none focus:border-[#1a1612]/40 disabled:cursor-not-allowed"
+            aria-label={`${label}の数値入力`}
+          />
+          <span className="text-sm text-[#1a1612]/55">{unit}</span>
+        </div>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => {
+          const next = Number(e.target.value);
+          const normalized = normalize ? normalize(next) : next;
+          onChange(normalized);
+        }}
+        className="w-full accent-[#2a6f6a] disabled:cursor-not-allowed"
+        aria-label={`${label}のスライダー`}
+      />
+      <div className="flex justify-between text-xs text-[#1a1612]/40">
+        <span>
+          {min}
+          {unit}
+        </span>
+        <span>
+          {max}
+          {unit}
+        </span>
+      </div>
+      {hint ? <p className="text-xs text-[#1a1612]/45">{hint}</p> : null}
     </div>
   );
 }
