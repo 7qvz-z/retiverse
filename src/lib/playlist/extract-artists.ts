@@ -289,37 +289,34 @@ function artistsFromTitle(
   const found: string[] = [];
   const workRaw = title.normalize("NFKC");
 
-  found.push(...knownArtistsInText(workRaw));
+  // 【】内は装飾・タグ扱いなので無視してから解析
+  const work = workRaw.replace(/【[^】]*】/g, " ").replace(/\s+/g, " ").trim();
+
+  found.push(...knownArtistsInText(work));
 
   const jpQuoted =
-    workRaw.match(/^(.{1,40}?)[「『]([^」』]{1,80})[」』]/) ||
-    workRaw.match(/^(.{1,40}?)[\u201c\u2018](.+)[\u201d\u2019]/);
+    work.match(/^(.{1,40}?)[「『]([^」』]{1,80})[」』]/) ||
+    work.match(/^(.{1,40}?)[\u201c\u2018](.+)[\u201d\u2019]/);
   if (jpQuoted?.[1]) {
     found.push(...tokenizeArtistRaw(jpQuoted[1]));
   }
 
-  const bracketName = workRaw.match(/^[【\[](.{1,30}?)[】\]]/);
-  if (bracketName?.[1]) {
-    found.push(...tokenizeArtistRaw(bracketName[1]));
-  }
-
-  const byMatch = workRaw.match(/\s+by\s+(.{1,40})$/i);
+  const byMatch = work.match(/\s+by\s+(.{1,40})$/i);
   if (byMatch?.[1]) {
     found.push(...tokenizeArtistRaw(byMatch[1]));
   }
 
   if (opts.allowLooseSplit) {
-    let work = workRaw
+    let loose = work
       .replace(/\[[^\]]*]/g, " ")
       .replace(/\([^)]*\)/g, " ")
-      .replace(/【[^】]*】/g, " ")
       .replace(/「[^」]*」/g, " ")
       .replace(/『[^』]*』/g, " ")
       .replace(TITLE_JUNK, " ")
       .replace(/\s+/g, " ")
       .trim();
 
-    const split = work.match(/^(.{1,40}?)\s*[-–—|/／｜]\s*(.{1,80})$/);
+    const split = loose.match(/^(.{1,40}?)\s*[-–—|/／｜]\s*(.{1,80})$/);
     if (split?.[1] && split[2]) {
       const left = tokenizeArtistRaw(split[1]);
       const right = tokenizeArtistRaw(split[2]);
