@@ -16,9 +16,12 @@ export default function AppLayout({
           >
             {APP_NAME}
           </Link>
-          <nav className="flex gap-5 text-sm">
+          <nav className="flex flex-wrap gap-4 text-sm sm:gap-5">
             <Link href="/" className="hover:opacity-70">
               ホーム
+            </Link>
+            <Link href="/settings/tastes" className="hover:opacity-70">
+              好み
             </Link>
             <Link href="/settings" className="hover:opacity-70">
               設定
