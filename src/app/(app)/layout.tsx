@@ -23,6 +23,9 @@ export default function AppLayout({
             <Link href="/settings/tastes" className="hover:opacity-70">
               好み
             </Link>
+            <Link href="/settings/playlists" className="hover:opacity-70">
+              PL解析
+            </Link>
             <Link href="/settings" className="hover:opacity-70">
               設定
             </Link>

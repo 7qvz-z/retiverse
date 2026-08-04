@@ -33,6 +33,8 @@ export default async function SettingsPage() {
         favoriteGenres: [],
         preferences: DEFAULT_PREFERENCES,
         plan: "free",
+        analyzedPlaylistIds: [],
+        playlistAnalysis: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

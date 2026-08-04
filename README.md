@@ -37,6 +37,7 @@ http://localhost:3000/login を開く。
 | `/generate` | プレイリスト生成（プレビュー・YouTube追加） |
 | `/settings` | 設定（生成オプション・曲数・プラン） |
 | `/settings/tastes` | アーティスト・ジャンル編集 |
+| `/settings/playlists` | YouTubeプレイリスト解析 |
 | `/me` | マイページ（プロフィール・履歴・お気に入り） |
 
 ### 初回設定を使う前に

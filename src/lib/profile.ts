@@ -1,3 +1,4 @@
+import type { PlaylistAnalysis } from "@/lib/playlist/analysis-types";
 import {
   DEFAULT_PREFERENCES,
   type Profile,
@@ -14,6 +15,8 @@ export type ProfileRow = {
   favorite_genres: string[] | null;
   preferences: UserPreferences | null;
   plan: "free" | "premium";
+  analyzed_playlist_ids?: string[] | null;
+  playlist_analysis?: PlaylistAnalysis | null;
   created_at: string;
   updated_at: string;
 };
@@ -29,6 +32,8 @@ export function mapProfile(row: ProfileRow): Profile {
     favoriteGenres: row.favorite_genres ?? [],
     preferences: { ...DEFAULT_PREFERENCES, ...(row.preferences ?? {}) },
     plan: row.plan,
+    analyzedPlaylistIds: row.analyzed_playlist_ids ?? [],
+    playlistAnalysis: row.playlist_analysis ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

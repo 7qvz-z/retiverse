@@ -101,6 +101,7 @@ export async function POST(request: Request) {
     const { tracks, queriesUsed } = await generateTrackList({
       artists: profile?.favoriteArtists ?? [],
       genres: profile?.favoriteGenres ?? [],
+      analyzedArtists: profile?.playlistAnalysis?.artists ?? [],
       moods: mergedMoods,
       environments: mergedEnvs,
       noteKeywords: noteAnalysis?.unmatchedKeywords ?? [],
@@ -111,7 +112,12 @@ export async function POST(request: Request) {
           TRACK_COUNT.max,
         ),
       },
-      excludeVideoIds: [...new Set(excludeVideoIds)],
+      excludeVideoIds: [
+        ...new Set([
+          ...excludeVideoIds,
+          ...(profile?.playlistAnalysis?.videoIds ?? []),
+        ]),
+      ],
       accessToken,
       apiKey,
     });

@@ -135,12 +135,20 @@ export function SettingsForm({ profile }: Props) {
           アーティスト {profile.favoriteArtists.length} / ジャンル{" "}
           {profile.favoriteGenres.length}
         </p>
-        <Link
-          href="/settings/tastes"
-          className="inline-block text-sm text-[#2a6f6a] underline-offset-2 hover:underline"
-        >
-          アーティスト・ジャンルを編集
-        </Link>
+        <div className="flex flex-wrap gap-3 text-sm">
+          <Link
+            href="/settings/tastes"
+            className="text-[#2a6f6a] underline-offset-2 hover:underline"
+          >
+            アーティスト・ジャンルを編集
+          </Link>
+          <Link
+            href="/settings/playlists"
+            className="text-[#2a6f6a] underline-offset-2 hover:underline"
+          >
+            YouTubeプレイリストを解析
+          </Link>
+        </div>
       </section>
 
       <section className="space-y-4">

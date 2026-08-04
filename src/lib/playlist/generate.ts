@@ -18,6 +18,8 @@ export type GenerateInput = {
   moods: Mood[];
   environments: EnvironmentTag[];
   noteKeywords: string[];
+  /** 解析済みプレイリスト由来のアーティスト */
+  analyzedArtists?: string[];
   preferences: UserPreferences;
   excludeVideoIds: string[];
   accessToken: string | null;
@@ -45,7 +47,12 @@ export function buildSearchQueries(input: GenerateInput): string[] {
   const { artists, genres, moods, environments, noteKeywords, preferences } =
     input;
 
-  for (const artist of artists.slice(0, 8)) {
+  const analyzedArtists = input.analyzedArtists ?? [];
+  const mergedArtists = [
+    ...new Set([...artists, ...analyzedArtists]),
+  ].slice(0, 12);
+
+  for (const artist of mergedArtists.slice(0, 8)) {
     mvQueries.push(`${artist} Official Music Video`);
     mvQueries.push(`${artist} 公式 MV`);
     topicQueries.push(`${artist} Topic`);

@@ -1,3 +1,5 @@
+import type { PlaylistAnalysis } from "@/lib/playlist/analysis-types";
+
 export type Mood =
   | "energetic"
   | "want_to_cry"
@@ -46,6 +48,8 @@ export type Profile = {
   favoriteGenres: string[];
   preferences: UserPreferences;
   plan: "free" | "premium";
+  analyzedPlaylistIds: string[];
+  playlistAnalysis: PlaylistAnalysis | null;
   createdAt: string;
   updatedAt: string;
 };
