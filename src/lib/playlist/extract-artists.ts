@@ -29,7 +29,7 @@ const ARTIST_NOISE = [
   /^ヴァリアス・?アーティスト$/,
 ];
 
-/** アーティスト名ではなくレーベル／番組系チャンネル */
+/** アーティスト本人ではなく番組・レーベル系 */
 const NON_ARTIST_CHANNEL = [
   /the\s*first\s*take/i,
   /sony\s*music/i,
@@ -56,8 +56,8 @@ const TITLE_JUNK =
 const CJK_RE = /[\u3040-\u30ff\u4e00-\u9fff]/;
 
 /**
- * 学マス（初星学園）など、ローマ字 Topic を日本語名へ寄せる
- * key は normalizeKey 後
+ * ローマ字 → 日本語（全アーティスト共通。既知のものだけ変換）
+ * 未知のローマ字はタイトル側の日本語を優先し、無ければチャンネル名を使う
  */
 const ROMAJI_TO_JAPANESE: Record<string, string> = {
   hatsuhoshigakuen: "初星学園",
@@ -94,7 +94,7 @@ const ROMAJI_TO_JAPANESE: Record<string, string> = {
   tsubameamaya: "雨夜燕",
 };
 
-/** タイトル中に出てきたら拾う日本語の固有名 */
+/** タイトル中にあれば拾う既知の日本語名（例） */
 const KNOWN_JP_ARTISTS = [
   "初星学園",
   "花海咲季",
@@ -112,6 +112,9 @@ const KNOWN_JP_ARTISTS = [
   "雨夜燕",
 ] as const;
 
+/** コラボ区切り（×）。半角xは両側に空白があるときだけ */
+const COLLAB_SPLIT = /\s*[×✕✖ｘ]\s*|\s+x\s+/i;
+
 function stripChannelSuffix(channelTitle: string): string {
   return channelTitle
     .replace(/\s*-\s*Topic$/i, "")
@@ -128,6 +131,7 @@ function normalizeKey(name: string): string {
     .toLowerCase()
     .replace(/[\s\u3000・･._\-–—']/g, "")
     .replace(/[’'`]/g, "")
+    .replace(/[×✕✖ｘx]/g, "x")
     .trim();
 }
 
@@ -139,16 +143,15 @@ function hasJapaneseScript(name: string): boolean {
   return CJK_RE.test(name);
 }
 
-function isRomajiHeavy(name: string): boolean {
+function isLatinOnly(name: string): boolean {
   if (hasJapaneseScript(name)) return false;
-  const letters = name.replace(/[^a-zA-Z]/g, "");
-  return letters.length >= 2;
+  return /[a-zA-Z]/.test(name);
 }
 
 function scriptPriority(name: string): number {
   const jp = cjkScore(name);
   if (jp > 0) return 100 + Math.min(jp, 20);
-  if (isRomajiHeavy(name)) return 10;
+  if (isLatinOnly(name)) return 10;
   return 40;
 }
 
@@ -173,17 +176,49 @@ function looksLikeSongTitle(name: string): boolean {
   return false;
 }
 
-/** ローマ字を既知の日本語名へ。未知のローマ字は null（出さない） */
-function toJapaneseDisplayName(raw: string): string | null {
+function isSameArtist(a: string, b: string): boolean {
+  const ka = normalizeKey(a);
+  const kb = normalizeKey(b);
+  if (!ka || !kb) return false;
+  if (ka === kb) return true;
+  if (ka.includes(kb) || kb.includes(ka)) return true;
+  return false;
+}
+
+/**
+ * × は原則コラボ → 分割。
+ * 例外: 左右が同じ（GILTY×GILTY など）はグループ名としてそのまま
+ */
+export function expandCollabNames(raw: string): string[] {
+  const name = raw.trim();
+  if (!name || !COLLAB_SPLIT.test(name)) return [name];
+
+  const parts = name
+    .split(COLLAB_SPLIT)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  if (parts.length < 2) return [name];
+
+  const allSame = parts.every((p) => normalizeKey(p) === normalizeKey(parts[0]));
+  if (allSame) return [name];
+
+  return parts;
+}
+
+/** 既知ローマ字は日本語へ。日本語はそのまま。未知ラテンは呼び出し側で優先度処理 */
+function canonicalizeName(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
-  if (hasJapaneseScript(trimmed)) return trimmed;
+
+  if (hasJapaneseScript(trimmed)) {
+    return isUsableArtistName(trimmed) ? trimmed : null;
+  }
 
   const mapped = ROMAJI_TO_JAPANESE[normalizeKey(trimmed)];
   if (mapped) return mapped;
 
-  // 未知のローマ字は採用しない
-  if (isRomajiHeavy(trimmed)) return null;
+  if (!isUsableArtistName(trimmed)) return null;
   return trimmed;
 }
 
@@ -207,35 +242,46 @@ function isUsableArtistName(name: string): boolean {
   return true;
 }
 
-function cleanArtistToken(raw: string): string | null {
-  let name = raw
-    .normalize("NFKC")
-    .replace(TITLE_JUNK, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  name = name.split(/\s+(?:feat\.?|ft\.?|featuring)\s+/i)[0]?.trim() ?? name;
-  if (!isUsableArtistName(name)) return null;
-  return toJapaneseDisplayName(name);
+function tokenizeArtistRaw(raw: string): string[] {
+  const names: string[] = [];
+  for (const part of expandCollabNames(raw.normalize("NFKC").trim())) {
+    let name = part
+      .replace(TITLE_JUNK, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    name = name.split(/\s+(?:feat\.?|ft\.?|featuring)\s+/i)[0]?.trim() ?? name;
+    const canon = canonicalizeName(name);
+    if (canon) names.push(canon);
+  }
+  return names;
 }
 
 export function artistNameFromChannel(channelTitle: string): string | null {
   if (!channelTitle?.trim()) return null;
   const name = stripChannelSuffix(channelTitle.trim());
-  if (!isUsableArtistName(name)) return null;
-  if (isLikelyNonArtistChannel(name)) return null;
-  return toJapaneseDisplayName(name);
-}
-
-/** タイトル本文に含まれる既知の日本語アーティスト名 */
-function knownArtistsInText(text: string): string[] {
-  const found: string[] = [];
-  for (const name of KNOWN_JP_ARTISTS) {
-    if (text.includes(name)) found.push(name);
+  if (isLikelyNonArtistChannel(name) || isLikelyNonArtistChannel(channelTitle)) {
+    return null;
   }
-  return found;
+  const names = tokenizeArtistRaw(name);
+  return names[0] ?? null;
 }
 
+function artistsFromChannel(channelTitle: string): string[] {
+  if (!channelTitle?.trim()) return [];
+  const name = stripChannelSuffix(channelTitle.trim());
+  if (isLikelyNonArtistChannel(name) || isLikelyNonArtistChannel(channelTitle)) {
+    return [];
+  }
+  return tokenizeArtistRaw(name);
+}
+
+function knownArtistsInText(text: string): string[] {
+  return KNOWN_JP_ARTISTS.filter((name) => text.includes(name));
+}
+
+/**
+ * タイトルから高確度のアーティスト名だけ取る
+ */
 function artistsFromTitle(
   title: string,
   opts: { allowLooseSplit: boolean },
@@ -246,24 +292,20 @@ function artistsFromTitle(
   found.push(...knownArtistsInText(workRaw));
 
   const jpQuoted =
-    workRaw.match(/^(.{1,30}?)[「『]([^」』]{1,80})[」』]/) ||
-    workRaw.match(/^(.{1,30}?)[\u201c\u2018](.+)[\u201d\u2019]/);
+    workRaw.match(/^(.{1,40}?)[「『]([^」』]{1,80})[」』]/) ||
+    workRaw.match(/^(.{1,40}?)[\u201c\u2018](.+)[\u201d\u2019]/);
   if (jpQuoted?.[1]) {
-    const cleaned = cleanArtistToken(jpQuoted[1]);
-    if (cleaned) found.push(cleaned);
+    found.push(...tokenizeArtistRaw(jpQuoted[1]));
   }
 
-  // 【花海咲季】曲名
-  const bracketName = workRaw.match(/^[【\[](.{1,20}?)[】\]]/);
+  const bracketName = workRaw.match(/^[【\[](.{1,30}?)[】\]]/);
   if (bracketName?.[1]) {
-    const cleaned = cleanArtistToken(bracketName[1]);
-    if (cleaned) found.push(cleaned);
+    found.push(...tokenizeArtistRaw(bracketName[1]));
   }
 
-  const byMatch = workRaw.match(/\s+by\s+(.{1,30})$/i);
+  const byMatch = workRaw.match(/\s+by\s+(.{1,40})$/i);
   if (byMatch?.[1]) {
-    const cleaned = cleanArtistToken(byMatch[1]);
-    if (cleaned) found.push(cleaned);
+    found.push(...tokenizeArtistRaw(byMatch[1]));
   }
 
   if (opts.allowLooseSplit) {
@@ -279,10 +321,9 @@ function artistsFromTitle(
 
     const split = work.match(/^(.{1,40}?)\s*[-–—|/／｜]\s*(.{1,80})$/);
     if (split?.[1] && split[2]) {
-      const left = cleanArtistToken(split[1]);
-      const right = cleanArtistToken(split[2]);
-      const candidates = [left, right].filter((x): x is string => Boolean(x));
-      candidates.sort(
+      const left = tokenizeArtistRaw(split[1]);
+      const right = tokenizeArtistRaw(split[2]);
+      const candidates = [...left, ...right].sort(
         (a, b) =>
           scriptPriority(b) - scriptPriority(a) || a.length - b.length,
       );
@@ -290,9 +331,9 @@ function artistsFromTitle(
     }
   }
 
-  return [...new Set(found)]
-    .filter((n) => hasJapaneseScript(n))
-    .sort((a, b) => scriptPriority(b) - scriptPriority(a));
+  return [...new Set(found)].sort(
+    (a, b) => scriptPriority(b) - scriptPriority(a),
+  );
 }
 
 function channelWeight(channelTitle: string): number {
@@ -304,12 +345,14 @@ function channelWeight(channelTitle: string): number {
 
 function withScriptWeight(base: number, name: string): number {
   if (hasJapaneseScript(name)) return base + 4;
-  return Math.max(1, Math.floor(base * 0.2));
+  // ラテン表記は全アーティスト共通で優先度を下げる
+  if (isLatinOnly(name)) return Math.max(1, Math.floor(base * 0.4));
+  return base;
 }
 
 /**
- * 原則: チャンネル名を日本語表記で使う
- * ローマ字 Topic は既知マップ／タイトル内の日本語名へ寄せる
+ * チャンネル優先。例外だけタイトルの出演者名を優先。
+ * ローマ字より日本語を全件で優先。
  */
 export function scoreArtistHints(
   title: string,
@@ -317,46 +360,74 @@ export function scoreArtistHints(
 ): { name: string; score: number }[] {
   if (!title || isExcludedNonSongTitle(title)) return [];
 
-  const channelArtist = artistNameFromChannel(channelTitle);
   const weight = channelWeight(channelTitle);
-  const fromTitle = artistsFromTitle(title, {
-    allowLooseSplit: !channelArtist,
-  });
-  const results: { name: string; score: number }[] = [];
+  const channelNames = artistsFromChannel(channelTitle);
+  const titleHigh = artistsFromTitle(title, { allowLooseSplit: false });
+  const titleLoose = artistsFromTitle(title, { allowLooseSplit: true });
 
-  const push = (name: string, score: number) => {
-    if (!hasJapaneseScript(name)) return;
-    if (!isUsableArtistName(name)) return;
-    results.push({ name, score: withScriptWeight(score, name) });
-  };
+  const channelIsNonArtist =
+    Boolean(channelTitle?.trim()) &&
+    channelNames.length === 0 &&
+    (isLikelyNonArtistChannel(stripChannelSuffix(channelTitle)) ||
+      isLikelyNonArtistChannel(channelTitle));
 
-  if (channelArtist && hasJapaneseScript(channelArtist)) {
-    push(channelArtist, weight);
+  const titleJp = titleHigh.filter((n) => hasJapaneseScript(n));
+  const channelJp = channelNames.filter((n) => hasJapaneseScript(n));
+  const channelLatin = channelNames.filter((n) => isLatinOnly(n));
+
+  // 例外: グループ／レーベルチャンネルなのに、タイトルが別人（ソロ）を明示
+  const soloOverride = titleJp.filter(
+    (solo) => !channelNames.some((ch) => isSameArtist(solo, ch)),
+  );
+
+  const useTitleOverChannel =
+    channelIsNonArtist ||
+    (channelNames.length > 0 && soloOverride.length > 0) ||
+    (channelLatin.length > 0 && titleJp.length > 0);
+
+  let chosen: string[] = [];
+
+  if (useTitleOverChannel) {
+    // タイトルの日本語（ソロ）を優先。無ければ緩い分割
+    if (soloOverride.length > 0) chosen = soloOverride;
+    else if (titleJp.length > 0) chosen = titleJp;
+    else if (titleHigh.length > 0) chosen = titleHigh;
+    else chosen = titleLoose;
+  } else if (channelNames.length > 0) {
+    // 原則: チャンネル名（日本語があればそれを、なければラテン）
+    chosen = channelJp.length > 0 ? channelJp : channelNames;
+    // タイトルに同じ人の日本語表記があれば差し替え
+    if (channelLatin.length > 0 && titleJp.length > 0) {
+      chosen = titleJp;
+    }
+  } else {
+    chosen = titleJp.length > 0 ? titleJp : titleHigh;
   }
 
-  // タイトルに出たアイドル名（初星学園メンバーなど）を必ず候補に
-  for (const name of fromTitle) {
-    push(name, weight + (channelArtist ? 0 : 1));
-  }
+  // 最終: 同じ人が日本語とラテンでいたら日本語だけ残す
+  const preferred = preferJapaneseNames(chosen);
 
-  // チャンネルが取れずレーベル等 → タイトル頼み
-  if (results.length === 0) {
-    const nonArtist =
-      Boolean(channelTitle?.trim()) &&
-      (isLikelyNonArtistChannel(stripChannelSuffix(channelTitle)) ||
-        isLikelyNonArtistChannel(channelTitle));
-    const loose = artistsFromTitle(title, { allowLooseSplit: nonArtist });
-    for (const name of loose) push(name, weight + 1);
-  }
-
-  // 同一名のスコア合算は rank 側で行う。ここではユニーク化
   const best = new Map<string, { name: string; score: number }>();
-  for (const hint of results) {
-    const key = normalizeKey(hint.name);
+  for (const name of preferred) {
+    if (!isUsableArtistName(name)) continue;
+    const score = withScriptWeight(
+      weight + (useTitleOverChannel && hasJapaneseScript(name) ? 1 : 0),
+      name,
+    );
+    const key = normalizeKey(name);
     const prev = best.get(key);
-    if (!prev || hint.score > prev.score) best.set(key, hint);
+    if (!prev || score > prev.score) best.set(key, { name, score });
   }
   return [...best.values()];
+}
+
+/** ラテンと日本語が混在したら日本語を優先（全アーティスト共通） */
+function preferJapaneseNames(names: string[]): string[] {
+  const unique = [...new Set(names)];
+  const jp = unique.filter((n) => hasJapaneseScript(n));
+  if (jp.length === 0) return unique;
+  // 日本語があるならラテンは落とす（別名併記を防ぐ）
+  return jp;
 }
 
 export function rankArtistsFromVideos(
@@ -379,11 +450,11 @@ export function rankArtistsFromVideos(
     }
   }
 
+  // 全体でも: 日本語名があるアーティスト集合に対し、低スコアのラテンを下げた上でソート
   return [...totals.values()]
     .filter(
       (a) =>
         a.score >= 3 &&
-        hasJapaneseScript(a.name) &&
         !looksLikeSongTitle(a.name) &&
         !ARTIST_NOISE.some((re) => re.test(a.name)),
     )
