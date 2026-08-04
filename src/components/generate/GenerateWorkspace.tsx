@@ -11,6 +11,7 @@ type Props = {
   environments: EnvironmentTag[];
   note: string;
   analysisText: string | null;
+  weatherLabel?: string | null;
 };
 
 type Phase = "loading" | "preview" | "publishing" | "done" | "error";
@@ -20,6 +21,7 @@ export function GenerateWorkspace({
   environments,
   note,
   analysisText,
+  weatherLabel = null,
 }: Props) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [progress, setProgress] = useState("曲を探しています…");
@@ -161,6 +163,7 @@ export function GenerateWorkspace({
           <p>環境: {environmentLabels(environments)}</p>
         ) : null}
         {note ? <p>その他: {note}</p> : null}
+        {weatherLabel ? <p>取得した天気: {weatherLabel}</p> : null}
         {analysisText ? (
           <p className="text-[#1f4f4b]">解析: {analysisText}</p>
         ) : null}

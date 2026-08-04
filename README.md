@@ -46,4 +46,10 @@ http://localhost:3000/login を開く。
 3. Google OAuth のリダイレクト URI に  
    `https://<project>.supabase.co/auth/v1/callback` があること
 
-詳細は `リテイバース_仕様書_v2.md` を参照。
+### 天気・季節・時間帯
+
+設定で ON にすると、ホームで自動取得・環境チップへ反映します。
+
+- 天気: ブラウザの位置情報 → Open-Meteo API（APIキー不要）
+- 季節: 端末の日付
+- 時間帯: 端末の現在時刻

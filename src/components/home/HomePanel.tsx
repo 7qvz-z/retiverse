@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ContextHints } from "@/components/home/ContextHints";
 import { ENVIRONMENTS, MOODS } from "@/lib/constants";
 import {
   environmentLabels,
@@ -18,6 +19,7 @@ import {
   type NoteAnalysis,
 } from "@/lib/note-analysis";
 import type { EnvironmentTag, Mood } from "@/lib/types";
+import type { WeatherSnapshot } from "@/lib/weather";
 
 type Props = {
   displayName: string | null;
@@ -25,6 +27,9 @@ type Props = {
   favorites: GenerationSummary[];
   artistCount: number;
   genreCount: number;
+  considerWeather: boolean;
+  considerSeason: boolean;
+  considerTimeOfDay: boolean;
 };
 
 const ENV_GROUPS: {
@@ -42,14 +47,32 @@ export function HomePanel({
   favorites,
   artistCount,
   genreCount,
+  considerWeather,
+  considerSeason,
+  considerTimeOfDay,
 }: Props) {
   const router = useRouter();
   const [moods, setMoods] = useState<Mood[]>([]);
   const [environments, setEnvironments] = useState<EnvironmentTag[]>([]);
   const [otherNote, setOtherNote] = useState("");
   const [analysis, setAnalysis] = useState<NoteAnalysis | null>(null);
+  const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
 
   const canGenerate = moods.length > 0 || otherNote.trim().length > 0;
+
+  const handleApplyHints = useCallback(
+    (tags: EnvironmentTag[], weatherSnap: WeatherSnapshot | null) => {
+      setWeather(weatherSnap);
+      setEnvironments((prev) => {
+        const next = [...prev];
+        for (const tag of tags) {
+          if (!next.includes(tag)) next.push(tag);
+        }
+        return next;
+      });
+    },
+    [],
+  );
 
   const summary = useMemo(() => {
     if (moods.length === 0 && !otherNote.trim()) {
@@ -103,6 +126,10 @@ export function HomePanel({
       params.set("environments", environments.join(","));
     }
     if (otherNote.trim()) params.set("note", otherNote.trim());
+    if (weather) {
+      params.set("weather", weather.environment);
+      params.set("weatherLabel", weather.label);
+    }
     router.push(`/generate?${params.toString()}`);
   }
 
@@ -128,6 +155,15 @@ export function HomePanel({
             好みを編集
           </Link>
         </p>
+
+        <div className="mt-5">
+          <ContextHints
+            considerWeather={considerWeather}
+            considerSeason={considerSeason}
+            considerTimeOfDay={considerTimeOfDay}
+            onApply={handleApplyHints}
+          />
+        </div>
       </section>
 
       <section className="space-y-4">

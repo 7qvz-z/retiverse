@@ -1,11 +1,6 @@
 import Link from "next/link";
 import { GenerateWorkspace } from "@/components/generate/GenerateWorkspace";
-import {
-  environmentLabels,
-  isEnvironment,
-  isMood,
-  moodLabels,
-} from "@/lib/home";
+import { isEnvironment, isMood } from "@/lib/home";
 import { analyzeOtherNote, describeAnalysis } from "@/lib/note-analysis";
 
 type SearchParams = Promise<{
@@ -13,6 +8,8 @@ type SearchParams = Promise<{
   moods?: string;
   environments?: string;
   note?: string;
+  weather?: string;
+  weatherLabel?: string;
 }>;
 
 export default async function GeneratePage({
@@ -63,6 +60,7 @@ export default async function GeneratePage({
             moods={moods}
             environments={environments}
             note={note}
+            weatherLabel={params.weatherLabel?.trim() || null}
             analysisText={
               noteAnalysis ? describeAnalysis(noteAnalysis) : null
             }

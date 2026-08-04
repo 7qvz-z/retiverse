@@ -81,6 +81,9 @@ export default async function HomePage() {
         favorites={favorites}
         artistCount={profile?.favoriteArtists.length ?? 0}
         genreCount={profile?.favoriteGenres.length ?? 0}
+        considerWeather={profile?.preferences.considerWeather ?? false}
+        considerSeason={profile?.preferences.considerSeason ?? false}
+        considerTimeOfDay={profile?.preferences.considerTimeOfDay ?? false}
       />
     </main>
   );
