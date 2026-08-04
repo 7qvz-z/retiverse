@@ -1,4 +1,5 @@
 import { TRACK_COUNT } from "@/lib/constants";
+import { filterToSongsOnly } from "@/lib/playlist/filters";
 import {
   ENV_SEARCH_TERMS,
   MOOD_SEARCH_TERMS,
@@ -33,39 +34,46 @@ function clampTrackCount(n: number): number {
   return Math.min(TRACK_COUNT.max, Math.max(TRACK_COUNT.min, n));
 }
 
-/** クォータ節約のため検索クエリ数を抑える */
+/** クォータ節約のため検索クエリ数を抑える（曲・公式寄り） */
 export function buildSearchQueries(input: GenerateInput): string[] {
   const queries: string[] = [];
   const { artists, genres, moods, environments, noteKeywords, preferences } =
     input;
 
   for (const artist of artists.slice(0, 8)) {
-    queries.push(`${artist} 公式`);
+    queries.push(`${artist} Topic`);
+    queries.push(`${artist} Official Music Video`);
+    queries.push(`${artist} 公式 MV`);
     if (moods[0]) {
       const term = MOOD_SEARCH_TERMS[moods[0]][0];
-      queries.push(`${artist} ${term}`);
+      queries.push(`${artist} ${term} Topic`);
     }
   }
 
   for (const genre of genres.slice(0, 6)) {
-    const moodTerm = moods[0] ? MOOD_SEARCH_TERMS[moods[0]][0] : "おすすめ";
-    queries.push(`${genre} ${moodTerm}`);
+    const moodTerm = moods[0] ? MOOD_SEARCH_TERMS[moods[0]][0] : "人気";
+    queries.push(`${genre} ${moodTerm} Topic`);
+    queries.push(`${genre} Official Music Video`);
   }
 
   for (const mood of moods.slice(0, 4)) {
-    queries.push(...MOOD_SEARCH_TERMS[mood].slice(0, 1));
+    const term = MOOD_SEARCH_TERMS[mood][0];
+    queries.push(`${term} Topic`);
+    queries.push(`${term} Official Music Video`);
   }
 
   for (const env of environments.slice(0, 4)) {
-    queries.push(...ENV_SEARCH_TERMS[env].slice(0, 1));
+    const term = ENV_SEARCH_TERMS[env][0];
+    queries.push(`${term} Topic`);
   }
 
   for (const keyword of noteKeywords.slice(0, 3)) {
-    queries.push(`${keyword} 曲`);
+    queries.push(`${keyword} Topic`);
+    queries.push(`${keyword} Official Music Video`);
   }
 
   if (preferences.mixNewTracks) {
-    queries.push("新曲 おすすめ 2024", "話題曲");
+    queries.push("新曲 Official Music Video", "話題曲 Topic");
   }
 
   // 重複除去・上限（search は 100 ユニット／回）
@@ -108,11 +116,8 @@ export async function generateTrackList(
   );
 
   for (const query of queries) {
-    const found = await youtubeSearch(
-      query,
-      input.accessToken,
-      input.apiKey,
-      perQuery,
+    const found = filterToSongsOnly(
+      await youtubeSearch(query, input.accessToken, input.apiKey, perQuery),
     );
     for (const track of found) {
       if (exclude.has(track.videoId) || seen.has(track.videoId)) continue;
@@ -130,12 +135,10 @@ export async function generateTrackList(
     );
   }
 
-  // ランダム性が高いほど先頭寄りを崩す（すでに shuffle 済み）
   if (
     input.preferences.randomnessEnabled &&
     input.preferences.randomnessPercent < 50
   ) {
-    // 低ランダム時はクエリ順プールをやや優先（先頭半分を固定寄りに）
     const keep = Math.floor(selected.length * 0.4);
     selected = [...pool.slice(0, keep), ...selected].filter(
       (track, index, arr) =>
@@ -153,16 +156,14 @@ export async function findReplacementTrack(
   input: GenerateInput & { seedQuery: string },
 ): Promise<TrackCandidate | null> {
   const queries = [
-    input.seedQuery,
+    `${input.seedQuery} Topic`,
+    `${input.seedQuery} Official Music Video`,
     ...buildSearchQueries(input).slice(0, 3),
   ];
 
   for (const query of queries) {
-    const found = await youtubeSearch(
-      query,
-      input.accessToken,
-      input.apiKey,
-      15,
+    const found = filterToSongsOnly(
+      await youtubeSearch(query, input.accessToken, input.apiKey, 15),
     );
     const hit = found.find((t) => !input.excludeVideoIds.includes(t.videoId));
     if (hit) return hit;
