@@ -1,4 +1,6 @@
 import type { PlaylistAnalysis } from "@/lib/playlist/analysis-types";
+import { isExcludedNonSongTitle } from "@/lib/playlist/filters";
+import { rankArtistsFromVideos } from "@/lib/playlist/extract-artists";
 
 type PlaylistListItem = {
   id?: string;
@@ -79,7 +81,7 @@ export async function listMinePlaylists(accessToken: string) {
 export async function listPlaylistVideoSnippets(
   accessToken: string,
   playlistId: string,
-  maxItems = 50,
+  maxItems = 100,
 ) {
   const videos: {
     videoId: string;
@@ -112,9 +114,13 @@ export async function listPlaylistVideoSnippets(
       const videoId =
         item.contentDetails?.videoId ?? item.snippet?.resourceId?.videoId;
       if (!videoId) continue;
+      const title = item.snippet?.title ?? "";
+      // 非楽曲は解析対象から除外（メドレー・予告など）
+      if (isExcludedNonSongTitle(title)) continue;
+
       videos.push({
         videoId,
-        title: item.snippet?.title ?? "",
+        title,
         channelTitle: item.snippet?.videoOwnerChannelTitle ?? "",
       });
       if (videos.length >= maxItems) break;
@@ -126,42 +132,20 @@ export async function listPlaylistVideoSnippets(
   return videos;
 }
 
-/** タイトル・チャンネルからアーティスト候補を抽出 */
+/** @deprecated extract-artists の scoreArtistHints を使用 */
 export function extractArtistHints(
   title: string,
   channelTitle: string,
 ): string[] {
-  const hints: string[] = [];
-
-  if (/ - Topic$/i.test(channelTitle)) {
-    const name = channelTitle.replace(/\s*-\s*Topic$/i, "").trim();
-    if (name) hints.push(name);
-  }
-
-  const cleaned = title
-    .replace(/\[[^\]]*]/g, " ")
-    .replace(/\([^)]*\)/g, " ")
-    .replace(/【[^】]*】/g, " ")
-    .replace(/「[^」]*」/g, " ")
-    .replace(/Official\s*(Music\s*)?Video/gi, " ")
-    .replace(/\bMV\b/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  const split = cleaned.match(/^(.{1,40}?)\s*[-–—\/|]\s*(.+)$/);
-  if (split?.[1]) {
-    const artist = split[1].trim();
-    if (artist.length >= 1 && artist.length <= 40) hints.push(artist);
-  }
-
-  return hints;
+  return rankArtistsFromVideos([{ title, channelTitle, videoId: "x" }], 10).map(
+    (a) => a.name,
+  );
 }
 
 export function buildPlaylistAnalysis(
   playlistMeta: { id: string; title: string }[],
   videos: { videoId: string; title: string; channelTitle: string }[],
 ): PlaylistAnalysis {
-  const artistCounts = new Map<string, number>();
   const channelCounts = new Map<string, number>();
   const sampleTitles: string[] = [];
   const videoIds: string[] = [];
@@ -171,25 +155,15 @@ export function buildPlaylistAnalysis(
     if (sampleTitles.length < 20 && video.title) {
       sampleTitles.push(video.title);
     }
-
     if (video.channelTitle) {
       channelCounts.set(
         video.channelTitle,
         (channelCounts.get(video.channelTitle) ?? 0) + 1,
       );
     }
-
-    for (const hint of extractArtistHints(video.title, video.channelTitle)) {
-      const key = hint.trim();
-      if (!key) continue;
-      artistCounts.set(key, (artistCounts.get(key) ?? 0) + 1);
-    }
   }
 
-  const artists = [...artistCounts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 30)
-    .map(([name]) => name);
+  const ranked = rankArtistsFromVideos(videos, 40);
 
   const channels = [...channelCounts.entries()]
     .sort((a, b) => b[1] - a[1])
@@ -199,7 +173,7 @@ export function buildPlaylistAnalysis(
   return {
     playlistIds: playlistMeta.map((p) => p.id),
     playlistTitles: playlistMeta.map((p) => p.title),
-    artists,
+    artists: ranked.map((a) => a.name),
     channels,
     sampleTitles,
     videoIds: [...new Set(videoIds)].slice(0, 300),

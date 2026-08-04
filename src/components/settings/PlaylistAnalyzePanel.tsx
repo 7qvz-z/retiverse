@@ -204,15 +204,19 @@ export function PlaylistAnalyzePanel({
             対象: {analysis.playlistTitles.join(" / ")}
           </p>
           <div>
-            <p className="text-sm font-medium">抽出アーティスト</p>
+            <p className="text-sm font-medium">抽出アーティスト（信頼度順）</p>
+            <p className="mt-1 text-xs text-[#1a1612]/45">
+              Topic / 公式MV を優先し、メドレー・予告などは除外しています
+            </p>
             <div className="mt-2 flex flex-wrap gap-2">
               {analysis.artists.length === 0 ? (
                 <span className="text-xs text-[#1a1612]/45">なし</span>
               ) : (
-                analysis.artists.map((artist) => (
+                analysis.artists.map((artist, index) => (
                   <span
                     key={artist}
                     className="rounded-full bg-[#1a1612] px-3 py-1 text-xs text-[#f4f0e8]"
+                    title={`順位 ${index + 1}`}
                   >
                     {artist}
                   </span>

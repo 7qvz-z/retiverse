@@ -56,7 +56,7 @@ export async function POST(request: Request) {
       const items = await listPlaylistVideoSnippets(
         accessToken,
         playlist.id,
-        50,
+        100,
       );
       videos.push(...items);
     }
