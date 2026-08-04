@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GenerateWorkspace } from "@/components/generate/GenerateWorkspace";
 import {
   environmentLabels,
   isEnvironment,
@@ -36,7 +37,6 @@ export default async function GeneratePage({
 
   const note = params.note?.trim() ?? "";
   const noteAnalysis = note ? analyzeOtherNote(note) : null;
-
   const hasSelection = moods.length > 0 || note.length > 0;
 
   return (
@@ -45,37 +45,30 @@ export default async function GeneratePage({
         プレイリスト生成
       </h1>
 
-      {hasSelection ? (
-        <div className="mt-4 space-y-2 text-[#1a1612]/70">
-          {moods.length > 0 ? (
-            <p>気分: {moodLabels(moods)}</p>
-          ) : null}
-          {environments.length > 0 ? (
-            <p>環境: {environmentLabels(environments)}</p>
-          ) : null}
-          {note ? <p>その他: {note}</p> : null}
-          {noteAnalysis ? (
-            <p className="text-sm text-[#1f4f4b]">
-              解析: {describeAnalysis(noteAnalysis)}
-            </p>
-          ) : null}
+      {!hasSelection ? (
+        <div className="mt-6 space-y-4">
+          <p className="text-[#1a1612]/70">
+            気分が選ばれていません。ホームから選び直してください。
+          </p>
+          <Link
+            href="/"
+            className="inline-block text-sm text-[#2a6f6a] underline-offset-2 hover:underline"
+          >
+            ホームに戻る
+          </Link>
         </div>
       ) : (
-        <p className="mt-4 text-[#1a1612]/70">
-          気分が選ばれていません。ホームから選び直してください。
-        </p>
+        <div className="mt-8">
+          <GenerateWorkspace
+            moods={moods}
+            environments={environments}
+            note={note}
+            analysisText={
+              noteAnalysis ? describeAnalysis(noteAnalysis) : null
+            }
+          />
+        </div>
       )}
-
-      <p className="mt-6 text-sm text-[#1a1612]/55">
-        生成中表示・プレビュー・YouTube 追加は次の画面実装で追加します。
-      </p>
-
-      <Link
-        href="/"
-        className="mt-8 inline-block text-sm text-[#2a6f6a] underline-offset-2 hover:underline"
-      >
-        ホームに戻る
-      </Link>
     </main>
   );
 }
