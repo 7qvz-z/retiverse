@@ -32,10 +32,17 @@ http://localhost:3000/login を開く。
 | パス | 内容 |
 |------|------|
 | `/login` | Google ログイン |
-| `/setup` | 初回設定（実装予定） |
+| `/setup` | 初回設定（YouTube連携・好み・設定） |
 | `/` | ホーム（実装予定） |
 | `/generate` | プレイリスト生成（実装予定） |
 | `/settings` | 設定（実装予定） |
 | `/me` | マイページ（実装予定） |
+
+### 初回設定を使う前に
+
+1. Supabase SQL Editor で `supabase/migrations/20260804000000_init.sql` を実行
+2. Google Cloud で **YouTube Data API v3** を有効化
+3. Google OAuth のリダイレクト URI に  
+   `https://<project>.supabase.co/auth/v1/callback` があること
 
 詳細は `リテイバース_仕様書_v2.md` を参照。

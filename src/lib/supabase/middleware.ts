@@ -45,10 +45,30 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (user && pathname === "/login") {
-    const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/";
-    return NextResponse.redirect(redirectUrl);
+  if (user) {
+    let onboardingCompleted = true;
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("onboarding_completed")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!error) {
+      onboardingCompleted = profile?.onboarding_completed ?? false;
+    }
+
+    if (pathname === "/login") {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = onboardingCompleted ? "/" : "/setup";
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    const isSetup = pathname === "/setup";
+    if (!onboardingCompleted && !isSetup && !pathname.startsWith("/auth/")) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/setup";
+      return NextResponse.redirect(redirectUrl);
+    }
   }
 
   return supabaseResponse;

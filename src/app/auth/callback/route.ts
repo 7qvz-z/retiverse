@@ -8,9 +8,19 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (!error && data.user) {
+      const meta = data.user.user_metadata ?? {};
+      await supabase.from("profiles").upsert({
+        id: data.user.id,
+        display_name: meta.full_name ?? meta.name ?? null,
+        avatar_url: meta.avatar_url ?? meta.picture ?? null,
+        updated_at: new Date().toISOString(),
+      });
+
+      const safeNext = next.startsWith("/") ? next : "/";
+      return NextResponse.redirect(`${origin}${safeNext}`);
     }
   }
 
