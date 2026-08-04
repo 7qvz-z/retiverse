@@ -139,7 +139,7 @@ export function SettingsForm({ profile }: Props) {
           href="/settings/tastes"
           className="inline-block text-sm text-[#2a6f6a] underline-offset-2 hover:underline"
         >
-          アーティスト・ジャンルを確認
+          アーティスト・ジャンルを編集
         </Link>
       </section>
 

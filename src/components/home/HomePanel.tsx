@@ -125,7 +125,7 @@ export function HomePanel({
             href="/settings/tastes"
             className="underline underline-offset-2 hover:text-[#1a1612]"
           >
-            好みを編集（準備中）
+            好みを編集
           </Link>
         </p>
       </section>

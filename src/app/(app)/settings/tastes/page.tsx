@@ -1,6 +1,6 @@
-import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { TastesForm } from "@/components/settings/TastesForm";
 import { mapProfile, type ProfileRow } from "@/lib/profile";
+import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
 export default async function TastesSettingsPage() {
@@ -28,57 +28,16 @@ export default async function TastesSettingsPage() {
         アーティスト・ジャンル
       </h1>
       <p className="mt-3 text-[#1a1612]/65">
-        編集画面はこれから作ります。いまは登録内容の確認だけできます。
+        いつでも追加・削除できます。保存すると次の生成から反映されます。
       </p>
 
-      <section className="mt-10 space-y-6">
-        <div>
-          <h2 className="text-sm font-medium text-[#1a1612]/55">
-            好きなアーティスト
-          </h2>
-          {profile?.favoriteArtists.length ? (
-            <ul className="mt-3 flex flex-wrap gap-2">
-              {profile.favoriteArtists.map((artist) => (
-                <li
-                  key={artist}
-                  className="rounded-full bg-[#1a1612] px-3 py-1 text-xs text-[#f4f0e8]"
-                >
-                  {artist}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-3 text-sm text-[#1a1612]/45">未登録</p>
-          )}
-        </div>
-
-        <div>
-          <h2 className="text-sm font-medium text-[#1a1612]/55">
-            好きなジャンル
-          </h2>
-          {profile?.favoriteGenres.length ? (
-            <ul className="mt-3 flex flex-wrap gap-2">
-              {profile.favoriteGenres.map((genre) => (
-                <li
-                  key={genre}
-                  className="rounded-full border border-[#1a1612]/15 bg-white px-3 py-1 text-xs"
-                >
-                  {genre}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-3 text-sm text-[#1a1612]/45">未登録</p>
-          )}
-        </div>
-      </section>
-
-      <Link
-        href="/"
-        className="mt-10 inline-block text-sm text-[#2a6f6a] underline-offset-2 hover:underline"
-      >
-        ホームに戻る
-      </Link>
+      <div className="mt-10">
+        <TastesForm
+          userId={user.id}
+          initialArtists={profile?.favoriteArtists ?? []}
+          initialGenres={profile?.favoriteGenres ?? []}
+        />
+      </div>
     </main>
   );
 }
