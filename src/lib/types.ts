@@ -12,12 +12,16 @@ export type Mood =
 
 export type EnvironmentTag =
   | "sunny"
+  | "cloudy"
   | "rainy"
+  | "snow"
+  | "morning"
+  | "daytime"
+  | "night"
   | "spring"
   | "summer"
   | "autumn"
-  | "winter"
-  | "night";
+  | "winter";
 
 export type UserPreferences = {
   considerSeason: boolean;

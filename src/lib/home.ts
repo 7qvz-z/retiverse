@@ -12,23 +12,38 @@ export type GenerationSummary = {
   trackCount: number;
 };
 
+export function parseMoods(value: string | null | undefined): Mood[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((v) => v.trim())
+    .filter(isMood);
+}
+
 export function moodLabel(mood: string | null): string {
-  if (!mood) return "気分なし";
-  return MOODS.find((m) => m.id === mood)?.label ?? mood;
+  const moods = parseMoods(mood);
+  if (moods.length === 0) {
+    if (!mood) return "気分なし";
+    return mood;
+  }
+  return moods.map((id) => MOODS.find((m) => m.id === id)?.label ?? id).join("・");
+}
+
+export function moodLabels(moods: Mood[]): string {
+  if (moods.length === 0) return "気分なし";
+  return moods.map((id) => MOODS.find((m) => m.id === id)?.label ?? id).join("・");
 }
 
 export function moodEmoji(mood: string | null): string {
-  if (!mood) return "🎵";
-  return MOODS.find((m) => m.id === mood)?.emoji ?? "🎵";
+  const moods = parseMoods(mood);
+  if (moods.length === 0) return "🎵";
+  return MOODS.find((m) => m.id === moods[0])?.emoji ?? "🎵";
 }
 
 export function environmentLabels(envs: string[]): string {
   if (envs.length === 0) return "";
   return envs
-    .map(
-      (id) =>
-        ENVIRONMENTS.find((e) => e.id === id)?.label ?? id,
-    )
+    .map((id) => ENVIRONMENTS.find((e) => e.id === id)?.label ?? id)
     .join("・");
 }
 

@@ -3,12 +3,15 @@ import {
   environmentLabels,
   isEnvironment,
   isMood,
-  moodLabel,
+  moodLabels,
 } from "@/lib/home";
+import { analyzeOtherNote, describeAnalysis } from "@/lib/note-analysis";
 
 type SearchParams = Promise<{
   mood?: string;
+  moods?: string;
   environments?: string;
+  note?: string;
 }>;
 
 export default async function GeneratePage({
@@ -17,11 +20,24 @@ export default async function GeneratePage({
   searchParams: SearchParams;
 }) {
   const params = await searchParams;
-  const mood = params.mood && isMood(params.mood) ? params.mood : null;
+
+  const moodsFromList = (params.moods ?? "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(isMood);
+  const legacyMood =
+    params.mood && isMood(params.mood) ? [params.mood] : [];
+  const moods = moodsFromList.length > 0 ? moodsFromList : legacyMood;
+
   const environments = (params.environments ?? "")
     .split(",")
     .map((v) => v.trim())
     .filter(isEnvironment);
+
+  const note = params.note?.trim() ?? "";
+  const noteAnalysis = note ? analyzeOtherNote(note) : null;
+
+  const hasSelection = moods.length > 0 || note.length > 0;
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-12">
@@ -29,13 +45,21 @@ export default async function GeneratePage({
         プレイリスト生成
       </h1>
 
-      {mood ? (
-        <p className="mt-4 text-[#1a1612]/70">
-          選択中: {moodLabel(mood)}
-          {environments.length > 0
-            ? ` × ${environmentLabels(environments)}`
-            : ""}
-        </p>
+      {hasSelection ? (
+        <div className="mt-4 space-y-2 text-[#1a1612]/70">
+          {moods.length > 0 ? (
+            <p>気分: {moodLabels(moods)}</p>
+          ) : null}
+          {environments.length > 0 ? (
+            <p>環境: {environmentLabels(environments)}</p>
+          ) : null}
+          {note ? <p>その他: {note}</p> : null}
+          {noteAnalysis ? (
+            <p className="text-sm text-[#1f4f4b]">
+              解析: {describeAnalysis(noteAnalysis)}
+            </p>
+          ) : null}
+        </div>
       ) : (
         <p className="mt-4 text-[#1a1612]/70">
           気分が選ばれていません。ホームから選び直してください。
