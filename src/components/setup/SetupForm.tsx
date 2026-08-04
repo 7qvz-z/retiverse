@@ -146,7 +146,11 @@ export function SetupForm({
             プレイリストの解析・作成に使います
           </p>
         </div>
-        <YouTubeConnectButton connected={connected} channelId={channelId} />
+        <YouTubeConnectButton
+          connected={connected}
+          channelId={channelId}
+          returnTo="/setup"
+        />
         <button
           type="button"
           onClick={syncYouTubeChannel}

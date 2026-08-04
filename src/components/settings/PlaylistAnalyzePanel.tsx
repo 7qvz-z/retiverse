@@ -2,17 +2,20 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { YouTubeConnectButton } from "@/components/setup/YouTubeConnectButton";
 import type { PlaylistAnalysis } from "@/lib/playlist/analysis-types";
 import type { YoutubePlaylistSummary } from "@/lib/playlist/analysis-types";
 
 type Props = {
   initialSelectedIds: string[];
   initialAnalysis: PlaylistAnalysis | null;
+  channelId: string | null;
 };
 
 export function PlaylistAnalyzePanel({
   initialSelectedIds,
   initialAnalysis,
+  channelId,
 }: Props) {
   const [playlists, setPlaylists] = useState<YoutubePlaylistSummary[]>([]);
   const [selected, setSelected] = useState<string[]>(initialSelectedIds);
@@ -91,8 +94,26 @@ export function PlaylistAnalyzePanel({
     }
   }
 
+  const needsReconnect =
+    Boolean(error) &&
+    (error?.includes("トークン") ||
+      error?.includes("連携") ||
+      error?.includes("認証"));
+
   return (
     <div className="space-y-8">
+      {needsReconnect ? (
+        <section className="rounded-2xl border border-[#b42318]/25 bg-white px-4 py-4">
+          <p className="text-sm text-[#b42318]">{error}</p>
+          <div className="mt-4">
+            <YouTubeConnectButton
+              connected={false}
+              channelId={channelId}
+              returnTo="/settings/playlists"
+            />
+          </div>
+        </section>
+      ) : null}
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
@@ -167,7 +188,7 @@ export function PlaylistAnalyzePanel({
         {analyzing ? "解析中…" : "選択したプレイリストを解析"}
       </button>
 
-      {error ? (
+      {error && !needsReconnect ? (
         <p className="text-sm text-[#b42318]" role="alert">
           {error}
         </p>

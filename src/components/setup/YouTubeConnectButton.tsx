@@ -5,11 +5,19 @@ import { createClient } from "@/lib/supabase/client";
 import { YOUTUBE_SCOPES } from "@/lib/setup-options";
 
 type Props = {
-  connected: boolean;
-  channelId: string | null;
+  connected?: boolean;
+  channelId?: string | null;
+  /** 連携後に戻るパス */
+  returnTo?: string;
+  className?: string;
 };
 
-export function YouTubeConnectButton({ connected, channelId }: Props) {
+export function YouTubeConnectButton({
+  connected = false,
+  channelId = null,
+  returnTo = "/settings/playlists",
+  className,
+}: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,11 +29,12 @@ export function YouTubeConnectButton({ connected, channelId }: Props) {
       const supabase = createClient();
       const siteUrl =
         process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin;
+      const nextPath = returnTo.startsWith("/") ? returnTo : "/settings/playlists";
 
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${siteUrl}/auth/callback?next=${encodeURIComponent("/setup")}`,
+          redirectTo: `${siteUrl}/auth/callback?next=${encodeURIComponent(nextPath)}`,
           scopes: YOUTUBE_SCOPES,
           queryParams: {
             access_type: "offline",
@@ -45,7 +54,7 @@ export function YouTubeConnectButton({ connected, channelId }: Props) {
   }
 
   return (
-    <div>
+    <div className={className}>
       <div className="flex flex-wrap items-center gap-3">
         <span
           className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${
@@ -54,7 +63,7 @@ export function YouTubeConnectButton({ connected, channelId }: Props) {
               : "bg-[#1a1612]/8 text-[#1a1612]/60"
           }`}
         >
-          {connected ? "連携済み" : "未連携"}
+          {connected ? "チャンネル情報あり" : "要再連携"}
         </span>
         {channelId ? (
           <span className="text-xs text-[#1a1612]/45">ID: {channelId}</span>
@@ -67,11 +76,7 @@ export function YouTubeConnectButton({ connected, channelId }: Props) {
         disabled={loading}
         className="mt-4 inline-flex items-center justify-center rounded-full border border-[#1a1612]/20 bg-white px-5 py-2.5 text-sm font-medium text-[#1a1612] transition hover:border-[#1a1612]/40 disabled:opacity-60"
       >
-        {loading
-          ? "接続中…"
-          : connected
-            ? "YouTube連携をやり直す"
-            : "YouTubeと連携する"}
+        {loading ? "接続中…" : "YouTube連携をやり直す"}
       </button>
 
       {error ? (
@@ -81,7 +86,7 @@ export function YouTubeConnectButton({ connected, channelId }: Props) {
       ) : null}
 
       <p className="mt-3 text-xs leading-relaxed text-[#1a1612]/50">
-        プレイリストの読み取り・作成のため、YouTube へのアクセス許可が必要です。
+        Googleの許可画面で YouTube へのアクセスを許可してください。終わるとこの画面に戻ります。
       </p>
     </div>
   );

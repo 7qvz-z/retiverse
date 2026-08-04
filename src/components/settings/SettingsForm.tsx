@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { YouTubeConnectButton } from "@/components/setup/YouTubeConnectButton";
 import {
   ARTIST_MAX_TRACKS,
   RANDOMNESS_STEP,
@@ -125,6 +126,20 @@ export function SettingsForm({ profile }: Props) {
             曲数 10〜300・重複回避つき。Premium 機能は今後追加予定です。
           </span>
         </div>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="font-[family-name:var(--font-display)] text-2xl">
+          YouTube連携
+        </h2>
+        <p className="text-sm text-[#1a1612]/55">
+          プレイリスト解析・YouTubeへの追加に必要です。トークンが切れたらここでやり直せます。
+        </p>
+        <YouTubeConnectButton
+          connected={Boolean(profile.youtubeChannelId)}
+          channelId={profile.youtubeChannelId}
+          returnTo="/settings"
+        />
       </section>
 
       <section className="space-y-3">

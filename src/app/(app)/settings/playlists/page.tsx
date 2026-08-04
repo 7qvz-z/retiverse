@@ -35,6 +35,7 @@ export default async function PlaylistAnalyzePage() {
         <PlaylistAnalyzePanel
           initialSelectedIds={profile?.analyzedPlaylistIds ?? []}
           initialAnalysis={profile?.playlistAnalysis ?? null}
+          channelId={profile?.youtubeChannelId ?? null}
         />
       </div>
     </main>
