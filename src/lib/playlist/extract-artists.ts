@@ -29,7 +29,6 @@ const ARTIST_NOISE = [
   /^ヴァリアス・?アーティスト$/,
 ];
 
-/** アーティスト本人ではなく番組・レーベル系 */
 const NON_ARTIST_CHANNEL = [
   /the\s*first\s*take/i,
   /sony\s*music/i,
@@ -53,15 +52,17 @@ const NON_ARTIST_CHANNEL = [
 const TITLE_JUNK =
   /Official\s*(Music\s*)?(Video|Audio)|Music\s*Video|\bMV\b|\bHD\b|\bHQ\b|歌詞付き?|フルサイズ|フルVer\.?|Official\s*Lyric\s*Video|Lyric\s*Video|Audio\s*Only|Visualizer|Performance\s*Video|Dance\s*Practice/gi;
 
-const CJK_RE = /[\u3040-\u30ff\u4e00-\u9fff]/;
+const CJK_RE = /[\u3040-\u30ff\u4e00-\u9fff\uff66-\uff9d]/;
 
 /**
- * ローマ字 → 日本語（全アーティスト共通。既知のものだけ変換）
- * 未知のローマ字はタイトル側の日本語を優先し、無ければチャンネル名を使う
+ * ローマ字 → 日本語（既知のみ）
  */
 const ROMAJI_TO_JAPANESE: Record<string, string> = {
+  // 初星学園 / 学マス
   hatsuhoshigakuen: "初星学園",
+  hatsuboshigakuen: "初星学園",
   hatsuhoshi: "初星学園",
+  hatsuboshi: "初星学園",
   gakuenidolmaster: "初星学園",
   gakumas: "初星学園",
   hanamisaki: "花海咲季",
@@ -92,9 +93,14 @@ const ROMAJI_TO_JAPANESE: Record<string, string> = {
   senajuo: "十王星南",
   amayatsubame: "雨夜燕",
   tsubameamaya: "雨夜燕",
+  // その他
+  itoguruma: "イトグルマ",
+  itoguruuma: "イトグルマ",
+  leen: "リーン",
+  sumireuesaka: "上坂すみれ",
+  uesakasumire: "上坂すみれ",
 };
 
-/** タイトル中にあれば拾う既知の日本語名（例） */
 const KNOWN_JP_ARTISTS = [
   "初星学園",
   "花海咲季",
@@ -110,9 +116,11 @@ const KNOWN_JP_ARTISTS = [
   "秦谷美鈴",
   "十王星南",
   "雨夜燕",
+  "イトグルマ",
+  "リーン",
+  "上坂すみれ",
 ] as const;
 
-/** コラボ区切り（×）。半角xは両側に空白があるときだけ */
 const COLLAB_SPLIT = /\s*[×✕✖ｘ]\s*|\s+x\s+/i;
 
 function stripChannelSuffix(channelTitle: string): string {
@@ -131,12 +139,13 @@ function normalizeKey(name: string): string {
     .toLowerCase()
     .replace(/[\s\u3000・･._\-–—']/g, "")
     .replace(/[’'`]/g, "")
+    .replace(/[（(]cv[:：]?[^）)]*[）)]/gi, "")
     .replace(/[×✕✖ｘx]/g, "x")
     .trim();
 }
 
 function cjkScore(name: string): number {
-  return (name.match(/[\u3040-\u30ff\u4e00-\u9fff]/g) ?? []).length;
+  return (name.match(/[\u3040-\u30ff\u4e00-\u9fff\uff66-\uff9d]/g) ?? []).length;
 }
 
 function hasJapaneseScript(name: string): boolean {
@@ -160,7 +169,9 @@ function isLikelyNonArtistChannel(name: string): boolean {
 }
 
 function looksLikeSongTitle(name: string): boolean {
-  if (name.length > 24) return true;
+  // CV 付き表記は人名として許可
+  if (/\(?\s*CV\s*[:：]/i.test(name)) return false;
+  if (name.length > 40) return true;
   if (
     /バージョン|ver\.?\b|remix|アコースティック|劇場版|映画|主題歌|エンディング|オープニング|フルサイズ|歌詞/i.test(
       name,
@@ -186,8 +197,27 @@ function isSameArtist(a: string, b: string): boolean {
 }
 
 /**
- * × は原則コラボ → 分割。
- * 例外: 左右が同じ（GILTY×GILTY など）はグループ名としてそのまま
+ * 「漢字 / ローマ字」形式 → 漢字側だけ残す
+ */
+export function preferKanjiFromSlash(raw: string): string[] {
+  const parts = raw
+    .split(/\s*[/／]\s*/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  if (parts.length < 2) return [raw.trim()].filter(Boolean);
+
+  const jp = parts.filter((p) => hasJapaneseScript(p));
+  const latin = parts.filter((p) => isLatinOnly(p));
+
+  // 日本語とローマ字が混在 → 日本語だけ
+  if (jp.length > 0 && latin.length > 0) return jp;
+
+  return parts;
+}
+
+/**
+ * × は原則コラボ分割。左右同じならグループ名のまま（GILTY×GILTY）
  */
 export function expandCollabNames(raw: string): string[] {
   const name = raw.trim();
@@ -200,26 +230,89 @@ export function expandCollabNames(raw: string): string[] {
 
   if (parts.length < 2) return [name];
 
-  const allSame = parts.every((p) => normalizeKey(p) === normalizeKey(parts[0]));
+  const allSame = parts.every(
+    (p) => normalizeKey(p) === normalizeKey(parts[0]),
+  );
   if (allSame) return [name];
 
   return parts;
 }
 
-/** 既知ローマ字は日本語へ。日本語はそのまま。未知ラテンは呼び出し側で優先度処理 */
-function canonicalizeName(raw: string): string | null {
+/**
+ * 「雷成きゅぴ アステル・レダ」のように空白区切りの別人は個別候補に
+ * （・でつながる1人名は分割しない）
+ */
+export function expandSpaceSeparatedArtists(raw: string): string[] {
+  const name = raw.trim();
+  if (!name) return [];
+
+  const parts = name.split(/[\s\u3000]+/).filter(Boolean);
+  if (parts.length < 2) return [name];
+
+  // すべて日本語っぽい短いトークンなら個別アーティスト
+  const allJpNames = parts.every(
+    (p) =>
+      hasJapaneseScript(p) &&
+      p.length >= 2 &&
+      p.length <= 24 &&
+      !looksLikeSongTitle(p),
+  );
+  if (allJpNames) return parts;
+
+  return [name];
+}
+
+/**
+ * leen(CV:Sumire Uesaka) → リーン（CV:上坂すみれ）
+ */
+export function formatCvArtistName(raw: string): string | null {
+  const m = raw
+    .trim()
+    .match(/^(.+?)\s*[（(]\s*CV\s*[:：]\s*(.+?)\s*[）)]\s*$/i);
+  if (!m?.[1] || !m[2]) return null;
+
+  const character = mapRomajiOrKeep(m[1].trim());
+  const cv = mapRomajiOrKeep(m[2].trim());
+  if (!character || !cv) return null;
+  return `${character}（CV:${cv}）`;
+}
+
+function mapRomajiOrKeep(raw: string): string | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
-
-  if (hasJapaneseScript(trimmed)) {
-    return isUsableArtistName(trimmed) ? trimmed : null;
-  }
+  if (hasJapaneseScript(trimmed)) return trimmed;
 
   const mapped = ROMAJI_TO_JAPANESE[normalizeKey(trimmed)];
   if (mapped) return mapped;
 
-  if (!isUsableArtistName(trimmed)) return null;
-  return trimmed;
+  // スペース区切りの欧文氏名もキー化して試す
+  const compact = ROMAJI_TO_JAPANESE[normalizeKey(trimmed.replace(/\s+/g, ""))];
+  if (compact) return compact;
+
+  return isLatinOnly(trimmed) ? trimmed : trimmed;
+}
+
+function canonicalizeName(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const cvForm = formatCvArtistName(trimmed);
+  if (cvForm) {
+    return isUsableArtistName(cvForm) ? cvForm : null;
+  }
+
+  if (hasJapaneseScript(trimmed)) {
+    const nfkc = trimmed.normalize("NFKC");
+    return isUsableArtistName(nfkc) ? nfkc : null;
+  }
+
+  const mapped = mapRomajiOrKeep(trimmed);
+  if (!mapped) return null;
+  if (hasJapaneseScript(mapped)) {
+    return isUsableArtistName(mapped) ? mapped : null;
+  }
+  if (!isUsableArtistName(mapped)) return null;
+  return mapped;
 }
 
 function preferDisplayName(current: string, candidate: string): string {
@@ -244,16 +337,24 @@ function isUsableArtistName(name: string): boolean {
 
 function tokenizeArtistRaw(raw: string): string[] {
   const names: string[] = [];
-  for (const part of expandCollabNames(raw.normalize("NFKC").trim())) {
-    let name = part
-      .replace(TITLE_JUNK, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    name = name.split(/\s+(?:feat\.?|ft\.?|featuring)\s+/i)[0]?.trim() ?? name;
-    const canon = canonicalizeName(name);
-    if (canon) names.push(canon);
+  let text = raw.normalize("NFKC").trim();
+  text = text.replace(TITLE_JUNK, " ").replace(/\s+/g, " ").trim();
+  text = text.split(/\s+(?:feat\.?|ft\.?|featuring)\s+/i)[0]?.trim() ?? text;
+  if (!text) return [];
+
+  // 1) 漢字/ローマ字 → 漢字だけ
+  for (const slashPart of preferKanjiFromSlash(text)) {
+    // 2) × コラボ
+    for (const collabPart of expandCollabNames(slashPart)) {
+      // 3) 空白区切りの別人
+      for (const spacePart of expandSpaceSeparatedArtists(collabPart)) {
+        const canon = canonicalizeName(spacePart);
+        if (canon) names.push(canon);
+      }
+    }
   }
-  return names;
+
+  return [...new Set(names)];
 }
 
 export function artistNameFromChannel(channelTitle: string): string | null {
@@ -279,9 +380,6 @@ function knownArtistsInText(text: string): string[] {
   return KNOWN_JP_ARTISTS.filter((name) => text.includes(name));
 }
 
-/**
- * タイトルから高確度のアーティスト名だけ取る
- */
 function artistsFromTitle(
   title: string,
   opts: { allowLooseSplit: boolean },
@@ -289,7 +387,7 @@ function artistsFromTitle(
   const found: string[] = [];
   const workRaw = title.normalize("NFKC");
 
-  // 【】内は装飾・タグ扱いなので無視してから解析
+  // 【】は無視
   const work = workRaw.replace(/【[^】]*】/g, " ").replace(/\s+/g, " ").trim();
 
   found.push(...knownArtistsInText(work));
@@ -307,7 +405,7 @@ function artistsFromTitle(
   }
 
   if (opts.allowLooseSplit) {
-    let loose = work
+    const loose = work
       .replace(/\[[^\]]*]/g, " ")
       .replace(/\([^)]*\)/g, " ")
       .replace(/「[^」]*」/g, " ")
@@ -316,7 +414,15 @@ function artistsFromTitle(
       .replace(/\s+/g, " ")
       .trim();
 
-    const split = loose.match(/^(.{1,40}?)\s*[-–—|/／｜]\s*(.{1,80})$/);
+    // A / B が漢字/ローマ字なら漢字だけ
+    const slashParts = preferKanjiFromSlash(loose);
+    if (slashParts.length >= 1 && /[/／]/.test(loose)) {
+      for (const part of slashParts) {
+        found.push(...tokenizeArtistRaw(part));
+      }
+    }
+
+    const split = loose.match(/^(.{1,40}?)\s*[-–—|｜]\s*(.{1,80})$/);
     if (split?.[1] && split[2]) {
       const left = tokenizeArtistRaw(split[1]);
       const right = tokenizeArtistRaw(split[2]);
@@ -342,15 +448,10 @@ function channelWeight(channelTitle: string): number {
 
 function withScriptWeight(base: number, name: string): number {
   if (hasJapaneseScript(name)) return base + 4;
-  // ラテン表記は全アーティスト共通で優先度を下げる
   if (isLatinOnly(name)) return Math.max(1, Math.floor(base * 0.4));
   return base;
 }
 
-/**
- * チャンネル優先。例外だけタイトルの出演者名を優先。
- * ローマ字より日本語を全件で優先。
- */
 export function scoreArtistHints(
   title: string,
   channelTitle: string,
@@ -372,7 +473,6 @@ export function scoreArtistHints(
   const channelJp = channelNames.filter((n) => hasJapaneseScript(n));
   const channelLatin = channelNames.filter((n) => isLatinOnly(n));
 
-  // 例外: グループ／レーベルチャンネルなのに、タイトルが別人（ソロ）を明示
   const soloOverride = titleJp.filter(
     (solo) => !channelNames.some((ch) => isSameArtist(solo, ch)),
   );
@@ -385,23 +485,21 @@ export function scoreArtistHints(
   let chosen: string[] = [];
 
   if (useTitleOverChannel) {
-    // タイトルの日本語（ソロ）を優先。無ければ緩い分割
     if (soloOverride.length > 0) chosen = soloOverride;
     else if (titleJp.length > 0) chosen = titleJp;
     else if (titleHigh.length > 0) chosen = titleHigh;
     else chosen = titleLoose;
   } else if (channelNames.length > 0) {
-    // 原則: チャンネル名（日本語があればそれを、なければラテン）
+    // チャンネルから複数（空白区切り別人）なら全部候補に
     chosen = channelJp.length > 0 ? channelJp : channelNames;
-    // タイトルに同じ人の日本語表記があれば差し替え
     if (channelLatin.length > 0 && titleJp.length > 0) {
-      chosen = titleJp;
+      chosen = [...new Set([...channelJp, ...titleJp])];
+      if (chosen.length === 0) chosen = titleJp;
     }
   } else {
     chosen = titleJp.length > 0 ? titleJp : titleHigh;
   }
 
-  // 最終: 同じ人が日本語とラテンでいたら日本語だけ残す
   const preferred = preferJapaneseNames(chosen);
 
   const best = new Map<string, { name: string; score: number }>();
@@ -418,12 +516,10 @@ export function scoreArtistHints(
   return [...best.values()];
 }
 
-/** ラテンと日本語が混在したら日本語を優先（全アーティスト共通） */
 function preferJapaneseNames(names: string[]): string[] {
   const unique = [...new Set(names)];
   const jp = unique.filter((n) => hasJapaneseScript(n));
   if (jp.length === 0) return unique;
-  // 日本語があるならラテンは落とす（別名併記を防ぐ）
   return jp;
 }
 
@@ -447,7 +543,6 @@ export function rankArtistsFromVideos(
     }
   }
 
-  // 全体でも: 日本語名があるアーティスト集合に対し、低スコアのラテンを下げた上でソート
   return [...totals.values()]
     .filter(
       (a) =>
