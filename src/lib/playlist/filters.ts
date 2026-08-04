@@ -12,7 +12,6 @@ const EXCLUDED_TITLE_PATTERNS: RegExp[] = [
   /スポット\s*CM/i,
   /\bCM\b/i,
   /コマーシャル/i,
-  /trailer/i,
   /behind\s*the\s*scenes/i,
   /メイキング/i,
   /making\s*(of|video)?/i,
@@ -49,7 +48,9 @@ const EXCLUDED_TITLE_PATTERNS: RegExp[] = [
   /歌詞\s*付き\s*まとめ/i,
 ];
 
-function isTopicChannel(channelTitle: string): boolean {
+export type MusicSourceKind = "mv" | "topic";
+
+export function isTopicChannel(channelTitle: string): boolean {
   return /(?:^|\s)-\s*Topic$/i.test(channelTitle.trim());
 }
 
@@ -65,32 +66,39 @@ function isOfficialMusicChannel(channelTitle: string): boolean {
   );
 }
 
-function looksLikeOfficialMvTitle(title: string): boolean {
+/** MV（ミュージックビデオ）っぽいタイトル */
+export function looksLikeOfficialMvTitle(title: string): boolean {
   return (
     /\bMV\b/i.test(title) ||
     /ミュージック\s*ビデオ/i.test(title) ||
     /music\s*video/i.test(title) ||
     /official\s*(music\s*)?video/i.test(title) ||
-    /公式\s*(ミュージック\s*)?(ビデオ|mv)/i.test(title) ||
-    /official\s*audio/i.test(title) ||
-    /公式オーディオ/i.test(title)
+    /公式\s*(ミュージック\s*)?(ビデオ|mv)/i.test(title)
   );
 }
 
-/** Topic / VEVO / 公式チャンネルのMV・公式音源だけ許可 */
-export function isAllowedMusicSource(track: TrackCandidate): boolean {
+/** MV として優先するソース（VEVO / 公式MV） */
+export function isMvSource(track: TrackCandidate): boolean {
   const { channelTitle, title } = track;
-
-  if (isTopicChannel(channelTitle) || isVevoChannel(channelTitle)) {
-    return true;
+  if (isTopicChannel(channelTitle)) return false;
+  if (isVevoChannel(channelTitle)) return true;
+  if (looksLikeOfficialMvTitle(title)) {
+    return isOfficialMusicChannel(channelTitle) || isVevoChannel(channelTitle);
   }
-
-  // 公式系チャンネルは、MV・Official Video・Official Audio のみ
-  if (isOfficialMusicChannel(channelTitle) && looksLikeOfficialMvTitle(title)) {
-    return true;
-  }
-
   return false;
+}
+
+export function getMusicSourceKind(
+  track: TrackCandidate,
+): MusicSourceKind | null {
+  if (isExcludedNonSongTitle(track.title)) return null;
+  if (isMvSource(track)) return "mv";
+  if (isTopicChannel(track.channelTitle)) return "topic";
+  return null;
+}
+
+export function isAllowedMusicSource(track: TrackCandidate): boolean {
+  return getMusicSourceKind(track) !== null;
 }
 
 export function isExcludedNonSongTitle(title: string): boolean {
@@ -98,8 +106,36 @@ export function isExcludedNonSongTitle(title: string): boolean {
 }
 
 export function filterToSongsOnly(tracks: TrackCandidate[]): TrackCandidate[] {
-  return tracks.filter(
-    (track) =>
-      !isExcludedNonSongTitle(track.title) && isAllowedMusicSource(track),
+  return tracks.filter((track) => getMusicSourceKind(track) !== null);
+}
+
+/**
+ * MV を優先し、足りない分を Topic チャンネルで埋める
+ */
+export function preferMvThenTopic(
+  tracks: TrackCandidate[],
+  targetCount: number,
+  shuffleFn: <T>(items: T[], enabled: boolean) => T[],
+  randomnessEnabled: boolean,
+): TrackCandidate[] {
+  const mvs = shuffleFn(
+    tracks.filter((t) => getMusicSourceKind(t) === "mv"),
+    randomnessEnabled,
   );
+  const topics = shuffleFn(
+    tracks.filter((t) => getMusicSourceKind(t) === "topic"),
+    randomnessEnabled,
+  );
+
+  const merged: TrackCandidate[] = [];
+  const seen = new Set<string>();
+
+  for (const track of [...mvs, ...topics]) {
+    if (seen.has(track.videoId)) continue;
+    seen.add(track.videoId);
+    merged.push(track);
+    if (merged.length >= targetCount) break;
+  }
+
+  return merged;
 }

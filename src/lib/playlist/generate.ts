@@ -1,5 +1,9 @@
 import { TRACK_COUNT } from "@/lib/constants";
-import { filterToSongsOnly } from "@/lib/playlist/filters";
+import {
+  filterToSongsOnly,
+  getMusicSourceKind,
+  preferMvThenTopic,
+} from "@/lib/playlist/filters";
 import {
   ENV_SEARCH_TERMS,
   MOOD_SEARCH_TERMS,
@@ -34,53 +38,52 @@ function clampTrackCount(n: number): number {
   return Math.min(TRACK_COUNT.max, Math.max(TRACK_COUNT.min, n));
 }
 
-/** クォータ節約のため検索クエリ数を抑える（曲・公式寄り） */
+/** MV 検索を先に、Topic を後に並べる */
 export function buildSearchQueries(input: GenerateInput): string[] {
-  const queries: string[] = [];
+  const mvQueries: string[] = [];
+  const topicQueries: string[] = [];
   const { artists, genres, moods, environments, noteKeywords, preferences } =
     input;
 
   for (const artist of artists.slice(0, 8)) {
-    queries.push(`${artist} Topic`);
-    queries.push(`${artist} Official Music Video`);
-    queries.push(`${artist} 公式 MV`);
+    mvQueries.push(`${artist} Official Music Video`);
+    mvQueries.push(`${artist} 公式 MV`);
+    topicQueries.push(`${artist} Topic`);
     if (moods[0]) {
       const term = MOOD_SEARCH_TERMS[moods[0]][0];
-      queries.push(`${artist} ${term} Topic`);
+      topicQueries.push(`${artist} ${term} Topic`);
     }
   }
 
   for (const genre of genres.slice(0, 6)) {
     const moodTerm = moods[0] ? MOOD_SEARCH_TERMS[moods[0]][0] : "人気";
-    queries.push(`${genre} ${moodTerm} Topic`);
-    queries.push(`${genre} Official Music Video`);
+    mvQueries.push(`${genre} ${moodTerm} Official Music Video`);
+    topicQueries.push(`${genre} ${moodTerm} Topic`);
   }
 
   for (const mood of moods.slice(0, 4)) {
     const term = MOOD_SEARCH_TERMS[mood][0];
-    queries.push(`${term} Topic`);
-    queries.push(`${term} Official Music Video`);
+    mvQueries.push(`${term} Official Music Video`);
+    topicQueries.push(`${term} Topic`);
   }
 
   for (const env of environments.slice(0, 4)) {
     const term = ENV_SEARCH_TERMS[env][0];
-    queries.push(`${term} Topic`);
+    topicQueries.push(`${term} Topic`);
   }
 
   for (const keyword of noteKeywords.slice(0, 3)) {
-    queries.push(`${keyword} Topic`);
-    queries.push(`${keyword} Official Music Video`);
+    mvQueries.push(`${keyword} Official Music Video`);
+    topicQueries.push(`${keyword} Topic`);
   }
 
   if (preferences.mixNewTracks) {
-    queries.push("新曲 Official Music Video", "話題曲 Topic");
+    mvQueries.push("新曲 Official Music Video");
+    topicQueries.push("話題曲 Topic");
   }
 
-  // 重複除去・上限（search は 100 ユニット／回）
-  return [...new Set(queries.map((q) => q.trim()).filter(Boolean))].slice(
-    0,
-    12,
-  );
+  const merged = [...mvQueries, ...topicQueries];
+  return [...new Set(merged.map((q) => q.trim()).filter(Boolean))].slice(0, 12);
 }
 
 function applyArtistBiasLimit(
@@ -126,23 +129,25 @@ export async function generateTrackList(
     }
   }
 
-  let selected = shuffle(pool, input.preferences.randomnessEnabled);
+  // MV 優先 → 不足分を Topic で補完
+  let selected = preferMvThenTopic(
+    pool,
+    target * 2,
+    shuffle,
+    input.preferences.randomnessEnabled,
+  );
 
   if (input.preferences.preventArtistBias) {
     selected = applyArtistBiasLimit(
       selected,
       input.preferences.maxTracksPerArtist,
     );
-  }
-
-  if (
-    input.preferences.randomnessEnabled &&
-    input.preferences.randomnessPercent < 50
-  ) {
-    const keep = Math.floor(selected.length * 0.4);
-    selected = [...pool.slice(0, keep), ...selected].filter(
-      (track, index, arr) =>
-        arr.findIndex((t) => t.videoId === track.videoId) === index,
+    // bias 適用後も MV→Topic の順を維持して詰め直す
+    selected = preferMvThenTopic(
+      selected,
+      target,
+      shuffle,
+      false,
     );
   }
 
@@ -155,17 +160,28 @@ export async function generateTrackList(
 export async function findReplacementTrack(
   input: GenerateInput & { seedQuery: string },
 ): Promise<TrackCandidate | null> {
-  const queries = [
-    `${input.seedQuery} Topic`,
+  const mvQueries = [
     `${input.seedQuery} Official Music Video`,
-    ...buildSearchQueries(input).slice(0, 3),
+    `${input.seedQuery} 公式 MV`,
+    ...buildSearchQueries(input).filter((q) =>
+      /Official Music Video|公式 MV/i.test(q),
+    ).slice(0, 2),
+  ];
+  const topicQueries = [
+    `${input.seedQuery} Topic`,
+    ...buildSearchQueries(input).filter((q) => /Topic/i.test(q)).slice(0, 2),
   ];
 
-  for (const query of queries) {
+  for (const query of [...mvQueries, ...topicQueries]) {
     const found = filterToSongsOnly(
       await youtubeSearch(query, input.accessToken, input.apiKey, 15),
     );
-    const hit = found.find((t) => !input.excludeVideoIds.includes(t.videoId));
+    // 差し替えも MV を先に探す
+    const ordered = [
+      ...found.filter((t) => getMusicSourceKind(t) === "mv"),
+      ...found.filter((t) => getMusicSourceKind(t) === "topic"),
+    ];
+    const hit = ordered.find((t) => !input.excludeVideoIds.includes(t.videoId));
     if (hit) return hit;
   }
 
