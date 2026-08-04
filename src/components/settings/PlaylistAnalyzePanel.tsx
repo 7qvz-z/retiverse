@@ -55,7 +55,10 @@ export function PlaylistAnalyzePanel({
     setPickedArtists([]);
   }, [analysis?.analyzedAt]);
 
-  const allArtistNames = analysis?.artists ?? [];
+  const allArtistNames = useMemo(() => {
+    const names = analysis?.artists ?? [];
+    return [...names].sort((a, b) => a.localeCompare(b, "ja"));
+  }, [analysis?.artists]);
   const allPicked = useMemo(
     () =>
       allArtistNames.length > 0 &&

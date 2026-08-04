@@ -27,7 +27,13 @@ const ARTIST_NOISE = [
   /^auto[\s-]?generated$/i,
   /^various\s*artists$/i,
   /^ヴァリアス・?アーティスト$/,
+  // 曲名の誤検知（YOASOBI「アイドル」など）
+  /^アイドル$/,
+  /^idol$/i,
 ];
+
+/** 曲名でありアーティスト名ではない語 */
+const SONG_TITLE_NAMES = [/^アイドル$/, /^idol$/i];
 
 const NON_ARTIST_CHANNEL = [
   /the\s*first\s*take/i,
@@ -99,6 +105,9 @@ const ROMAJI_TO_JAPANESE: Record<string, string> = {
   leen: "リーン",
   sumireuesaka: "上坂すみれ",
   uesakasumire: "上坂すみれ",
+  asumisena: "空澄セナ",
+  senaasumi: "空澄セナ",
+  asumisenaasumi: "空澄セナ",
 };
 
 const KNOWN_JP_ARTISTS = [
@@ -119,6 +128,7 @@ const KNOWN_JP_ARTISTS = [
   "イトグルマ",
   "リーン",
   "上坂すみれ",
+  "空澄セナ",
 ] as const;
 
 const COLLAB_SPLIT = /\s*[×✕✖ｘ]\s*|\s+x\s+/i;
@@ -169,6 +179,7 @@ function isLikelyNonArtistChannel(name: string): boolean {
 }
 
 function looksLikeSongTitle(name: string): boolean {
+  if (SONG_TITLE_NAMES.some((re) => re.test(name.trim()))) return true;
   // CV 付き表記は人名として許可
   if (/\(?\s*CV\s*[:：]/i.test(name)) return false;
   if (name.length > 40) return true;
@@ -192,7 +203,13 @@ function isSameArtist(a: string, b: string): boolean {
   const kb = normalizeKey(b);
   if (!ka || !kb) return false;
   if (ka === kb) return true;
-  if (ka.includes(kb) || kb.includes(ka)) return true;
+  // 短い片方の包含は別人を潰すので使わない（空澄セナ など）
+  const [longer, shorter] = ka.length >= kb.length ? [ka, kb] : [kb, ka];
+  if (shorter.length < 4) return false;
+  // 「名前Official」のような拡張だけ同一扱い
+  if (longer.startsWith(shorter) && /official|公式|channel|topic$/.test(longer)) {
+    return true;
+  }
   return false;
 }
 
@@ -543,19 +560,17 @@ export function rankArtistsFromVideos(
     }
   }
 
+  const collator = new Intl.Collator("ja", { sensitivity: "base" });
+
   return [...totals.values()]
     .filter(
       (a) =>
         a.score >= 3 &&
         !looksLikeSongTitle(a.name) &&
-        !ARTIST_NOISE.some((re) => re.test(a.name)),
+        !ARTIST_NOISE.some((re) => re.test(a.name)) &&
+        !SONG_TITLE_NAMES.some((re) => re.test(a.name)),
     )
-    .sort(
-      (a, b) =>
-        scriptPriority(b.name) - scriptPriority(a.name) ||
-        b.score - a.score ||
-        cjkScore(b.name) - cjkScore(a.name) ||
-        a.name.localeCompare(b.name, "ja"),
-    )
+    // 表示は五十音順
+    .sort((a, b) => collator.compare(a.name, b.name))
     .slice(0, limit);
 }

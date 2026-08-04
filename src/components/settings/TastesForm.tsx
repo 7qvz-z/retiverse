@@ -27,6 +27,11 @@ export function TastesForm({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const sortedArtists = useMemo(
+    () => [...artists].sort((a, b) => a.localeCompare(b, "ja")),
+    [artists],
+  );
+
   const dirty = useMemo(() => {
     return (
       JSON.stringify(artists) !== JSON.stringify(savedArtists) ||
@@ -166,7 +171,7 @@ export function TastesForm({
           <p className="text-sm text-[#1a1612]/45">未登録</p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {artists.map((artist) => {
+            {sortedArtists.map((artist) => {
               const checked = selectedArtists.includes(artist);
               return (
                 <button
