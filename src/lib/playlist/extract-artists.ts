@@ -50,13 +50,8 @@ function cleanArtistName(raw: string): string | null {
   // feat. 以降は別アーティスト扱いにせず主アーティストだけ残す
   name = name.split(/\s+(?:feat\.?|ft\.?|featuring)\s+/i)[0]?.trim() ?? name;
 
-  // コラボ「A × B」は先頭を優先（両方欲しい場合は呼び出し側で分割）
-  if (/[×xX]/.test(name) && name.length > 3) {
-    const parts = name.split(/\s*[×xX]\s*/).map((p) => p.trim()).filter(Boolean);
-    if (parts.length >= 2 && parts[0].length <= 30) {
-      name = parts[0];
-    }
-  }
+  // 「GILTY×GILTY」のようなグループ名の × は分割しない
+  // （左右が同じ、または × を名前の一部として扱う）
 
   if (!name || name.length > 40) return null;
   if (name.length < 2 && !/[\u3040-\u30ff\u4e00-\u9fff]/.test(name)) {

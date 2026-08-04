@@ -8,7 +8,6 @@ import {
 
 type Body = {
   playlistIds?: string[];
-  mergeArtistsToFavorites?: boolean;
 };
 
 export async function POST(request: Request) {
@@ -66,37 +65,16 @@ export async function POST(request: Request) {
       videos,
     );
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("favorite_artists")
-      .eq("id", session.user.id)
-      .maybeSingle();
-
-    const currentArtists =
-      (profile as { favorite_artists?: string[] } | null)?.favorite_artists ??
-      [];
-
-    let favoriteArtists = currentArtists;
-    if (body.mergeArtistsToFavorites) {
-      favoriteArtists = [
-        ...new Set([...currentArtists, ...analysis.artists.slice(0, 20)]),
-      ];
-    }
-
     const { error: updateError } = await supabase
       .from("profiles")
       .update({
         analyzed_playlist_ids: analysis.playlistIds,
         playlist_analysis: analysis,
-        ...(body.mergeArtistsToFavorites
-          ? { favorite_artists: favoriteArtists }
-          : {}),
         updated_at: new Date().toISOString(),
       })
       .eq("id", session.user.id);
 
     if (updateError) {
-      // マイグレーション未実行の可能性
       if (
         updateError.message.includes("analyzed_playlist_ids") ||
         updateError.message.includes("playlist_analysis") ||
@@ -116,7 +94,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       analysis,
-      favoriteArtists,
       videoCount: analysis.videoIds.length,
       artistCount: analysis.artists.length,
     });

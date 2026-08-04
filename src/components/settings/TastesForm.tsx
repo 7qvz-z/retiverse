@@ -21,6 +21,7 @@ export function TastesForm({
   const [genres, setGenres] = useState(initialGenres);
   const [savedArtists, setSavedArtists] = useState(initialArtists);
   const [savedGenres, setSavedGenres] = useState(initialGenres);
+  const [selectedArtists, setSelectedArtists] = useState<string[]>([]);
   const [customGenre, setCustomGenre] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -44,6 +45,27 @@ export function TastesForm({
     setGenres((prev) =>
       prev.includes(genre) ? prev.filter((g) => g !== genre) : [...prev, genre],
     );
+    setMessage(null);
+  }
+
+  function toggleSelectArtist(name: string) {
+    setSelectedArtists((prev) =>
+      prev.includes(name) ? prev.filter((a) => a !== name) : [...prev, name],
+    );
+  }
+
+  function selectAllArtists() {
+    setSelectedArtists(artists);
+  }
+
+  function clearArtistSelection() {
+    setSelectedArtists([]);
+  }
+
+  function bulkDeleteArtists() {
+    if (selectedArtists.length === 0) return;
+    setArtists((prev) => prev.filter((a) => !selectedArtists.includes(a)));
+    setSelectedArtists([]);
     setMessage(null);
   }
 
@@ -94,6 +116,7 @@ export function TastesForm({
 
       setSavedArtists(artists);
       setSavedGenres(genres);
+      setSelectedArtists([]);
       setMessage("好みを保存しました");
     } catch (e) {
       setError(e instanceof Error ? e.message : "保存に失敗しました");
@@ -110,16 +133,70 @@ export function TastesForm({
             好きなアーティスト
           </h2>
           <p className="mt-1 text-sm text-[#1a1612]/60">
-            追加・削除できます。生成の最重要材料です。
+            追加・選択削除ができます。変更後は保存してください。
           </p>
         </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={selectAllArtists}
+            className="rounded-full border border-[#1a1612]/15 px-3 py-1.5 text-xs"
+          >
+            全選択
+          </button>
+          <button
+            type="button"
+            onClick={clearArtistSelection}
+            className="rounded-full border border-[#1a1612]/15 px-3 py-1.5 text-xs"
+          >
+            選択解除
+          </button>
+          <button
+            type="button"
+            onClick={bulkDeleteArtists}
+            disabled={selectedArtists.length === 0}
+            className="rounded-full border border-[#b42318]/30 px-3 py-1.5 text-xs text-[#b42318] disabled:opacity-40"
+          >
+            選択を一括削除（{selectedArtists.length}）
+          </button>
+        </div>
+
+        {artists.length === 0 ? (
+          <p className="text-sm text-[#1a1612]/45">未登録</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {artists.map((artist) => {
+              const checked = selectedArtists.includes(artist);
+              return (
+                <button
+                  key={artist}
+                  type="button"
+                  onClick={() => toggleSelectArtist(artist)}
+                  className={`rounded-full px-3 py-1.5 text-xs transition ${
+                    checked
+                      ? "bg-[#b42318] text-white"
+                      : "bg-[#1a1612] text-[#f4f0e8]"
+                  }`}
+                >
+                  {checked ? "削除予定 · " : ""}
+                  {artist}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         <TagInput
           values={artists}
           onChange={(values) => {
             setArtists(values);
+            setSelectedArtists((prev) =>
+              prev.filter((a) => values.includes(a)),
+            );
             setMessage(null);
           }}
-          placeholder="例: 米津玄師"
+          placeholder="例: 米津玄師 / GILTY×GILTY"
         />
       </section>
 
@@ -191,16 +268,16 @@ export function TastesForm({
           {saving ? "保存中…" : "好みを保存"}
         </button>
         <Link
+          href="/settings/playlists"
+          className="text-sm text-[#2a6f6a] underline-offset-2 hover:underline"
+        >
+          PL解析へ
+        </Link>
+        <Link
           href="/settings"
           className="text-sm text-[#2a6f6a] underline-offset-2 hover:underline"
         >
           設定に戻る
-        </Link>
-        <Link
-          href="/"
-          className="text-sm text-[#1a1612]/50 underline-offset-2 hover:underline"
-        >
-          ホーム
         </Link>
       </div>
     </div>

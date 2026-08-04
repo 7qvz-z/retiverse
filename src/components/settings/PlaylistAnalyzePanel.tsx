@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { YouTubeConnectButton } from "@/components/setup/YouTubeConnectButton";
 import type { PlaylistAnalysis } from "@/lib/playlist/analysis-types";
 import type { YoutubePlaylistSummary } from "@/lib/playlist/analysis-types";
@@ -22,9 +22,10 @@ export function PlaylistAnalyzePanel({
   const [analysis, setAnalysis] = useState<PlaylistAnalysis | null>(
     initialAnalysis,
   );
-  const [mergeArtists, setMergeArtists] = useState(true);
+  const [pickedArtists, setPickedArtists] = useState<string[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -50,12 +51,41 @@ export function PlaylistAnalyzePanel({
     void loadPlaylists();
   }, [loadPlaylists]);
 
-  function toggle(id: string) {
+  useEffect(() => {
+    setPickedArtists([]);
+  }, [analysis?.analyzedAt]);
+
+  const allArtistNames = analysis?.artists ?? [];
+  const allPicked = useMemo(
+    () =>
+      allArtistNames.length > 0 &&
+      allArtistNames.every((a) => pickedArtists.includes(a)),
+    [allArtistNames, pickedArtists],
+  );
+
+  function togglePlaylist(id: string) {
     setSelected((prev) => {
       if (prev.includes(id)) return prev.filter((x) => x !== id);
       if (prev.length >= 5) return prev;
       return [...prev, id];
     });
+    setMessage(null);
+  }
+
+  function toggleArtist(name: string) {
+    setPickedArtists((prev) =>
+      prev.includes(name) ? prev.filter((a) => a !== name) : [...prev, name],
+    );
+    setMessage(null);
+  }
+
+  function selectAllArtists() {
+    setPickedArtists(allArtistNames);
+    setMessage(null);
+  }
+
+  function clearArtistSelection() {
+    setPickedArtists([]);
     setMessage(null);
   }
 
@@ -71,10 +101,7 @@ export function PlaylistAnalyzePanel({
       const res = await fetch("/api/youtube/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          playlistIds: selected,
-          mergeArtistsToFavorites: mergeArtists,
-        }),
+        body: JSON.stringify({ playlistIds: selected }),
       });
       const data = (await res.json()) as {
         error?: string;
@@ -84,13 +111,44 @@ export function PlaylistAnalyzePanel({
       };
       if (!res.ok) throw new Error(data.error ?? "解析に失敗しました");
       setAnalysis(data.analysis ?? null);
+      setPickedArtists([]);
       setMessage(
-        `解析完了: ${data.videoCount ?? 0}曲からアーティスト候補 ${data.artistCount ?? 0} 件を抽出しました`,
+        `解析完了: ${data.videoCount ?? 0}曲から候補 ${data.artistCount ?? 0} 件。追加したい人だけ選んでください。`,
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "解析に失敗しました");
     } finally {
       setAnalyzing(false);
+    }
+  }
+
+  async function handleAddSelected() {
+    if (pickedArtists.length === 0) {
+      setError("追加するアーティストを選んでください");
+      return;
+    }
+    setAdding(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/tastes/artists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ artists: pickedArtists }),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        addedCount?: number;
+      };
+      if (!res.ok) throw new Error(data.error ?? "追加に失敗しました");
+      setMessage(
+        `${data.addedCount ?? pickedArtists.length} 件を好きなアーティストに追加しました`,
+      );
+      setPickedArtists([]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "追加に失敗しました");
+    } finally {
+      setAdding(false);
     }
   }
 
@@ -114,6 +172,7 @@ export function PlaylistAnalyzePanel({
           </div>
         </section>
       ) : null}
+
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
@@ -141,7 +200,7 @@ export function PlaylistAnalyzePanel({
                   <input
                     type="checkbox"
                     checked={checked}
-                    onChange={() => toggle(playlist.id)}
+                    onChange={() => togglePlaylist(playlist.id)}
                     className="h-4 w-4 accent-[#2a6f6a]"
                   />
                   {playlist.thumbnailUrl ? (
@@ -169,16 +228,6 @@ export function PlaylistAnalyzePanel({
         </ul>
       )}
 
-      <label className="flex items-center gap-2 text-sm text-[#1a1612]/70">
-        <input
-          type="checkbox"
-          checked={mergeArtists}
-          onChange={(e) => setMergeArtists(e.target.checked)}
-          className="accent-[#2a6f6a]"
-        />
-        抽出したアーティストを「好きなアーティスト」にも追加する
-      </label>
-
       <button
         type="button"
         onClick={() => void handleAnalyze()}
@@ -203,27 +252,63 @@ export function PlaylistAnalyzePanel({
           <p className="text-xs text-[#1a1612]/45">
             対象: {analysis.playlistTitles.join(" / ")}
           </p>
-          <div>
-            <p className="text-sm font-medium">抽出アーティスト（信頼度順）</p>
-            <p className="mt-1 text-xs text-[#1a1612]/45">
-              Topic / 公式MV を優先し、メドレー・予告などは除外しています
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {analysis.artists.length === 0 ? (
-                <span className="text-xs text-[#1a1612]/45">なし</span>
-              ) : (
-                analysis.artists.map((artist, index) => (
-                  <span
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={selectAllArtists}
+              className="rounded-full border border-[#1a1612]/15 px-3 py-1.5 text-xs"
+            >
+              全選択
+            </button>
+            <button
+              type="button"
+              onClick={clearArtistSelection}
+              className="rounded-full border border-[#1a1612]/15 px-3 py-1.5 text-xs"
+            >
+              選択解除
+            </button>
+            <span className="self-center text-xs text-[#1a1612]/45">
+              {pickedArtists.length} / {allArtistNames.length} 選択中
+              {allPicked ? "（すべて）" : ""}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {allArtistNames.length === 0 ? (
+              <span className="text-xs text-[#1a1612]/45">候補なし</span>
+            ) : (
+              allArtistNames.map((artist) => {
+                const checked = pickedArtists.includes(artist);
+                return (
+                  <button
                     key={artist}
-                    className="rounded-full bg-[#1a1612] px-3 py-1 text-xs text-[#f4f0e8]"
-                    title={`順位 ${index + 1}`}
+                    type="button"
+                    onClick={() => toggleArtist(artist)}
+                    className={`rounded-full px-3 py-1.5 text-xs transition ${
+                      checked
+                        ? "bg-[#2a6f6a] text-white"
+                        : "border border-[#1a1612]/15 bg-white text-[#1a1612]"
+                    }`}
                   >
                     {artist}
-                  </span>
-                ))
-              )}
-            </div>
+                  </button>
+                );
+              })
+            )}
           </div>
+
+          <button
+            type="button"
+            onClick={() => void handleAddSelected()}
+            disabled={adding || pickedArtists.length === 0}
+            className="rounded-full bg-[#1a1612] px-5 py-2.5 text-sm font-semibold text-[#f4f0e8] disabled:opacity-40"
+          >
+            {adding
+              ? "追加中…"
+              : `選択した ${pickedArtists.length} 件を好きなアーティストに追加`}
+          </button>
+
           <p className="text-xs text-[#1a1612]/45">
             解析済み曲ID: {analysis.videoIds.length}（生成時の重複回避にも使用）
           </p>
@@ -232,12 +317,21 @@ export function PlaylistAnalyzePanel({
 
       <div className="flex flex-wrap gap-3 text-sm">
         <Link
+          href="/settings/tastes"
+          className="text-[#2a6f6a] underline-offset-2 hover:underline"
+        >
+          好みの編集・一括削除へ
+        </Link>
+        <Link
           href="/settings"
           className="text-[#2a6f6a] underline-offset-2 hover:underline"
         >
           設定に戻る
         </Link>
-        <Link href="/" className="text-[#1a1612]/50 underline-offset-2 hover:underline">
+        <Link
+          href="/"
+          className="text-[#1a1612]/50 underline-offset-2 hover:underline"
+        >
           ホーム
         </Link>
       </div>
