@@ -3,10 +3,14 @@ import {
   cleanChannelName,
   cleanExtractedName,
   extractArtistsFromVideo,
+  findSimilarPairs,
+  isBlockedName,
   mergeAliasIntoDictionary,
   normalizeArtistName,
   resolveSlashParts,
   splitArtistCandidates,
+  stringSimilarity,
+  validateArtistNames,
 } from "./index";
 
 describe("extractArtistsFromVideo — 必須ケース", () => {
@@ -23,11 +27,11 @@ describe("extractArtistsFromVideo — 必須ケース", () => {
       title:
         "【ORIGINAL SONG MV】「Q」 - Calliope Mori x Gawr Gura x DECO*27",
     });
-    expect(result.artists).toEqual([
-      "Calliope Mori",
-      "Gawr Gura",
-      "DECO*27",
-    ]);
+    expect(result.artists).toEqual(
+      ["Calliope Mori", "Gawr Gura", "DECO*27"].sort((a, b) =>
+        a.localeCompare(b, "ja"),
+      ),
+    );
     expect(result.confidence).toBe("high");
   });
 
@@ -96,6 +100,56 @@ describe("ステップB: エイリアス正規化", () => {
   });
 });
 
+describe("バリデーション", () => {
+  it("feat. は本体があるときだけ分割", () => {
+    expect(splitArtistCandidates("音莉飴 feat.弱酸性").artists).toEqual([
+      "音莉飴",
+      "弱酸性",
+    ]);
+    expect(splitArtistCandidates("feat.弱酸性").discarded.length).toBe(1);
+    expect(splitArtistCandidates("feat.弱酸性").artists).toEqual([]);
+  });
+
+  it("不揃い括弧は未分類", () => {
+    const r = splitArtistCandidates("Hauken (");
+    expect(r.artists).toEqual([]);
+    expect(r.unclassified.length).toBeGreaterThan(0);
+  });
+
+  it("ブロックリスト除外", () => {
+    expect(isBlockedName("HYBE LABELS")).toBe(true);
+    expect(isBlockedName("Official")).toBe(true);
+    expect(isBlockedName("音莉飴")).toBe(false);
+    const v = validateArtistNames(["音莉飴", "HYBE LABELS", "V"]);
+    expect(v.confirmed).toEqual(["音莉飴"]);
+    expect(v.unclassified.some((u) => u.name === "V")).toBe(true);
+  });
+
+  it("類似度で表記ゆれを検出", () => {
+    expect(stringSimilarity("Calliope Mori", "Calliope Mri")).toBeGreaterThan(
+      0.8,
+    );
+    const pairs = findSimilarPairs([
+      "Calliope Mori",
+      "Calliope Mri",
+      "YOASOBI",
+    ]);
+    expect(
+      pairs.some(
+        (p) =>
+          (p.a === "Calliope Mori" && p.b === "Calliope Mri") ||
+          (p.a === "Calliope Mri" && p.b === "Calliope Mori"),
+      ),
+    ).toBe(true);
+  });
+
+  it("空白差のみ（Lil Nas X / LilNasX）は同一キー扱いで確定は1件", () => {
+    expect(stringSimilarity("Lil Nas X", "LilNasX")).toBe(1);
+    const v = validateArtistNames(["Lil Nas X", "LilNasX"]);
+    expect(v.confirmed).toHaveLength(1);
+  });
+});
+
 describe("ユニット: slash / split", () => {
   it("曲名/アーティストは右側", () => {
     expect(
@@ -111,11 +165,13 @@ describe("ユニット: slash / split", () => {
 
   it("x コラボ分割", () => {
     expect(
-      splitArtistCandidates("Calliope Mori x Gawr Gura x DECO*27"),
+      splitArtistCandidates("Calliope Mori x Gawr Gura x DECO*27").artists,
     ).toEqual(["Calliope Mori", "Gawr Gura", "DECO*27"]);
   });
 
   it("GILTY×GILTY は分割しない", () => {
-    expect(splitArtistCandidates("GILTY×GILTY")).toEqual(["GILTY×GILTY"]);
+    expect(splitArtistCandidates("GILTY×GILTY").artists).toEqual([
+      "GILTY×GILTY",
+    ]);
   });
 });

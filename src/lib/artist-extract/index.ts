@@ -6,27 +6,33 @@ import {
 } from "./extract";
 import {
   ALIAS_DICTIONARY,
-  normalizeArtistNames,
+  normalizeArtistName,
   type AliasDictionary,
   type ArtistDict,
   ARTIST_DICT,
 } from "./normalize";
 import { splitArtistCandidates } from "./split";
+import {
+  validateArtistNames,
+  type SimilarPair,
+  type UnclassifiedItem,
+  type ValidationResult,
+} from "./validate";
 
 export type ArtistExtractInput = {
   title?: string;
   channelTitle?: string;
   description?: string;
-  /** テストや上書き用（canonical → aliases） */
   dictionary?: AliasDictionary;
-  /** @deprecated flat dict。dictionary を優先 */
   dict?: ArtistDict;
-  /** true のとき低自信度で Claude を呼ぶ（デフォルト false＝ルールのみ） */
   useClaudeFallback?: boolean;
 };
 
 export type ArtistExtractResult = {
+  /** 確定タグ（後方互換） */
   artists: string[];
+  unclassified: UnclassifiedItem[];
+  similarPairs: SimilarPair[];
   confidence: "high" | "low";
   source: "rules" | "claude";
 };
@@ -34,7 +40,6 @@ export type ArtistExtractResult = {
 function resolveDictionary(input: ArtistExtractInput): AliasDictionary {
   if (input.dictionary) return input.dictionary;
   if (input.dict) {
-    // flat → alias dictionary に変換（テスト互換）
     const inverted: AliasDictionary = {};
     for (const [aliasKey, canonical] of Object.entries(input.dict)) {
       const list = inverted[canonical] ?? [];
@@ -46,29 +51,67 @@ function resolveDictionary(input: ArtistExtractInput): AliasDictionary {
   return ALIAS_DICTIONARY;
 }
 
+type Collected = {
+  names: string[];
+  unclassified: UnclassifiedItem[];
+};
+
 /**
- * 1. 抽出セグメント → ステップAクリーニング → 2. 分割 → 3. ステップB正規化
+ * 抽出 → Aクリーニング → 厳格分割 → B正規化（バリデーション前）
  */
-function collectFromSegments(segments: string[]): string[] {
+function collectFromSegments(
+  segments: string[],
+  dictionary: AliasDictionary,
+): Collected {
   const names: string[] = [];
+  const unclassified: UnclassifiedItem[] = [];
+
   for (const seg of segments) {
-    // ステップA（抽出直後）
     const cleanedSeg = cleanExtractedName(seg);
     if (!cleanedSeg) continue;
-    for (const part of splitArtistCandidates(cleanedSeg)) {
-      const cleaned = cleanExtractedName(
-        part.replace(/[（(][^）)]*[）)]/g, "").trim(),
-      );
-      if (cleaned) names.push(cleaned);
+
+    const split = splitArtistCandidates(cleanedSeg);
+    for (const part of split.discarded) {
+      // feat. 欠落などは破棄（表示しない）
+      void part;
+    }
+    for (const part of split.unclassified) {
+      const cleaned = cleanExtractedName(part);
+      if (cleaned) {
+        unclassified.push({
+          name: cleaned,
+          reasons: ["括弧の開閉が不揃い、または分割修復できず"],
+        });
+      }
+    }
+    for (const part of split.artists) {
+      const cleaned = cleanExtractedName(part);
+      if (!cleaned) continue;
+      const normalized = normalizeArtistName(cleaned, dictionary);
+      if (normalized) names.push(normalized);
     }
   }
-  return names;
+
+  return { names, unclassified };
+}
+
+function toResult(
+  validation: ValidationResult,
+  confidence: "high" | "low",
+  source: "rules" | "claude",
+): ArtistExtractResult {
+  return {
+    artists: validation.confirmed,
+    unclassified: validation.unclassified,
+    similarPairs: validation.similarPairs,
+    confidence,
+    source,
+  };
 }
 
 /**
  * 動画メタデータからアーティスト名を抽出する
- *
- * 1. 抽出 → ステップAクリーニング → 2. 分割 → 3. ステップBエイリアス正規化
+ * 抽出 → 分割 → 正規化 → バリデーション
  */
 export function extractArtistsFromVideo(
   input: ArtistExtractInput,
@@ -101,14 +144,47 @@ export function extractArtistsFromVideo(
     confidence = fromTitle.confidence;
   }
 
-  const split = collectFromSegments(segments);
-  const artists = normalizeArtistNames(split, dictionary);
+  const collected = collectFromSegments(segments, dictionary);
+  const validation = validateArtistNames(
+    collected.names,
+    collected.unclassified,
+  );
 
-  if (artists.length > 0) {
-    return { artists, confidence, source: "rules" };
+  return toResult(validation, confidence, "rules");
+}
+
+/**
+ * 複数動画分をまとめて検証（PL解析用）
+ */
+export function aggregateValidatedArtists(
+  videos: { title: string; channelTitle: string }[],
+  dictionary?: AliasDictionary,
+): ValidationResult {
+  const score = new Map<string, number>();
+  const unclassifiedMap = new Map<string, UnclassifiedItem>();
+
+  for (const video of videos) {
+    const result = extractArtistsFromVideo({
+      title: video.title,
+      channelTitle: video.channelTitle,
+      dictionary,
+    });
+    for (const name of result.artists) {
+      score.set(name, (score.get(name) ?? 0) + 1);
+    }
+    for (const item of result.unclassified) {
+      const prev = unclassifiedMap.get(item.name);
+      if (!prev) unclassifiedMap.set(item.name, item);
+    }
   }
 
-  return { artists: [], confidence: "low", source: "rules" };
+  const names = [...score.entries()]
+    .filter(([, s]) => s >= 1)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ja"))
+    .slice(0, 60)
+    .map(([name]) => name);
+
+  return validateArtistNames(names, [...unclassifiedMap.values()]);
 }
 
 export async function extractArtistsFromVideoAsync(
@@ -128,11 +204,11 @@ export async function extractArtistsFromVideoAsync(
     description: input.description,
   });
   if (fromClaude && fromClaude.length > 0) {
-    return {
-      artists: normalizeArtistNames(fromClaude, resolveDictionary(input)),
-      confidence: "high",
-      source: "claude",
-    };
+    const names = fromClaude
+      .map((n) => normalizeArtistName(n, resolveDictionary(input)))
+      .filter(Boolean);
+    const validation = validateArtistNames(names);
+    return toResult(validation, "high", "claude");
   }
   return ruled;
 }
@@ -154,4 +230,12 @@ export {
   dictKey,
   buildAliasLookup,
 } from "./normalize";
+export {
+  validateArtistNames,
+  findSimilarPairs,
+  stringSimilarity,
+  isBlockedName,
+  detectAnomalies,
+} from "./validate";
 export type { AliasDictionary, ArtistDict } from "./normalize";
+export type { UnclassifiedItem, SimilarPair, ValidationResult } from "./validate";

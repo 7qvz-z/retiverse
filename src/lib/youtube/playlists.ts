@@ -1,4 +1,4 @@
-import { extractArtistsFromVideo } from "@/lib/artist-extract";
+import { aggregateValidatedArtists } from "@/lib/artist-extract";
 import type { PlaylistAnalysis } from "@/lib/playlist/analysis-types";
 import { isExcludedNonSongTitle } from "@/lib/playlist/filters";
 
@@ -137,7 +137,7 @@ export function extractArtistHints(
   title: string,
   channelTitle: string,
 ): string[] {
-  return extractArtistsFromVideo({ title, channelTitle }).artists;
+  return aggregateValidatedArtists([{ title, channelTitle }]).confirmed;
 }
 
 export function buildPlaylistAnalysis(
@@ -161,26 +161,9 @@ export function buildPlaylistAnalysis(
     }
   }
 
-  const artistScores = new Map<string, number>();
-  for (const video of videos) {
-    const { artists } = extractArtistsFromVideo({
-      title: video.title,
-      channelTitle: video.channelTitle,
-    });
-    for (const name of artists) {
-      artistScores.set(name, (artistScores.get(name) ?? 0) + 1);
-    }
-  }
-
-  const artists = [...artistScores.entries()]
-    .filter(([, score]) => score >= 1)
-    .sort(
-      (a, b) =>
-        b[1] - a[1] || a[0].localeCompare(b[0], "ja"),
-    )
-    .slice(0, 40)
-    .map(([name]) => name)
-    .sort((a, b) => a.localeCompare(b, "ja"));
+  const validated = aggregateValidatedArtists(
+    videos.map((v) => ({ title: v.title, channelTitle: v.channelTitle })),
+  );
 
   const channels = [...channelCounts.entries()]
     .sort((a, b) => b[1] - a[1])
@@ -190,7 +173,9 @@ export function buildPlaylistAnalysis(
   return {
     playlistIds: playlistMeta.map((p) => p.id),
     playlistTitles: playlistMeta.map((p) => p.title),
-    artists,
+    artists: validated.confirmed,
+    unclassifiedArtists: validated.unclassified,
+    similarPairs: validated.similarPairs,
     channels,
     sampleTitles,
     videoIds: [...new Set(videoIds)].slice(0, 300),

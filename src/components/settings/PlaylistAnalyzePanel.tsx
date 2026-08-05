@@ -59,13 +59,29 @@ export function PlaylistAnalyzePanel({
   }, [analysis?.analyzedAt]);
 
   const [artistNames, setArtistNames] = useState<string[]>([]);
+  const [unclassified, setUnclassified] = useState<
+    { name: string; reasons: string[] }[]
+  >([]);
+  const [similarPairs, setSimilarPairs] = useState<
+    { a: string; b: string; similarity: number }[]
+  >([]);
 
   useEffect(() => {
     const names = analysis?.artists ?? [];
     setArtistNames([...names].sort((a, b) => a.localeCompare(b, "ja")));
-  }, [analysis?.artists]);
+    setUnclassified(analysis?.unclassifiedArtists ?? []);
+    setSimilarPairs(analysis?.similarPairs ?? []);
+  }, [analysis?.artists, analysis?.unclassifiedArtists, analysis?.similarPairs]);
 
   const allArtistNames = artistNames;
+  const similarNameSet = useMemo(() => {
+    const s = new Set<string>();
+    for (const pair of similarPairs) {
+      s.add(pair.a);
+      s.add(pair.b);
+    }
+    return s;
+  }, [similarPairs]);
   const allPicked = useMemo(
     () =>
       allArtistNames.length > 0 &&
@@ -120,11 +136,25 @@ export function PlaylistAnalyzePanel({
       const data = (await res.json()) as { error?: string };
       if (!res.ok) throw new Error(data.error ?? "統合に失敗しました");
 
-      setArtistNames((prev) =>
-        [...new Set(prev.map((n) => (n === mergeFrom ? canonical : n)))].sort(
-          (a, b) => a.localeCompare(b, "ja"),
-        ),
+      setUnclassified((prev) =>
+        prev.filter((item) => item.name !== mergeFrom && item.name !== canonical),
       );
+      setSimilarPairs((prev) =>
+        prev.filter((p) => {
+          const involves =
+            p.a === canonical ||
+            p.a === mergeFrom ||
+            p.b === canonical ||
+            p.b === mergeFrom;
+          return !involves;
+        }),
+      );
+      setArtistNames((prev) => {
+        const next = new Set(prev);
+        next.add(canonical);
+        next.delete(mergeFrom);
+        return [...next].sort((a, b) => a.localeCompare(b, "ja"));
+      });
       setPickedArtists((prev) =>
         [...new Set(prev.map((n) => (n === mergeFrom ? canonical : n)))],
       );
@@ -319,7 +349,7 @@ export function PlaylistAnalyzePanel({
               onClick={selectAllArtists}
               className="rounded-full border border-[#1a1612]/15 px-3 py-1.5 text-xs"
             >
-              全選択
+              全選択（確定のみ）
             </button>
             <button
               type="button"
@@ -334,43 +364,131 @@ export function PlaylistAnalyzePanel({
             </span>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {allArtistNames.length === 0 ? (
-              <span className="text-xs text-[#1a1612]/45">候補なし</span>
-            ) : (
-              allArtistNames.map((artist) => {
-                const checked = pickedArtists.includes(artist);
-                const inMerge = mergePair.includes(artist);
-                return (
-                  <div key={artist} className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => toggleArtist(artist)}
-                      className={`rounded-full px-3 py-1.5 text-xs transition ${
-                        checked
-                          ? "bg-[#2a6f6a] text-white"
-                          : "border border-[#1a1612]/15 bg-white text-[#1a1612]"
-                      }`}
-                    >
-                      {artist}
-                    </button>
-                    <button
-                      type="button"
-                      title="統合用に選択"
-                      onClick={() => toggleMergeTag(artist)}
-                      className={`rounded-full px-2 py-1 text-[10px] transition ${
-                        inMerge
-                          ? "bg-[#8b4513] text-white"
-                          : "border border-[#1a1612]/10 text-[#1a1612]/45"
-                      }`}
-                    >
-                      統
-                    </button>
-                  </div>
-                );
-              })
-            )}
+          <div className="space-y-2">
+            <h3 className="text-sm font-medium text-[#1a1612]/70">
+              確定タグ（{allArtistNames.length}）
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {allArtistNames.length === 0 ? (
+                <span className="text-xs text-[#1a1612]/45">候補なし</span>
+              ) : (
+                allArtistNames.map((artist) => {
+                  const checked = pickedArtists.includes(artist);
+                  const inMerge = mergePair.includes(artist);
+                  const maybeSame = similarNameSet.has(artist);
+                  return (
+                    <div key={artist} className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => toggleArtist(artist)}
+                        className={`rounded-full px-3 py-1.5 text-xs transition ${
+                          checked
+                            ? "bg-[#2a6f6a] text-white"
+                            : maybeSame
+                              ? "border-2 border-[#c47b2b] bg-[#c47b2b]/10 text-[#1a1612]"
+                              : "border border-[#1a1612]/15 bg-white text-[#1a1612]"
+                        }`}
+                      >
+                        {artist}
+                      </button>
+                      <button
+                        type="button"
+                        title="統合用に選択"
+                        onClick={() => toggleMergeTag(artist)}
+                        className={`rounded-full px-2 py-1 text-[10px] transition ${
+                          inMerge
+                            ? "bg-[#8b4513] text-white"
+                            : "border border-[#1a1612]/10 text-[#1a1612]/45"
+                        }`}
+                      >
+                        統
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
+
+          {similarPairs.length > 0 ? (
+            <div className="space-y-2 rounded-xl border border-[#c47b2b]/35 bg-[#c47b2b]/8 px-3 py-3">
+              <h3 className="text-sm font-medium text-[#8b4513]">
+                もしかして同じ？（{similarPairs.length}）
+              </h3>
+              <ul className="space-y-2">
+                {similarPairs.map((pair) => (
+                  <li
+                    key={`${pair.a}__${pair.b}`}
+                    className="flex flex-wrap items-center gap-2 text-xs"
+                  >
+                    <span className="rounded-full border border-[#c47b2b]/40 bg-white px-2.5 py-1">
+                      {pair.a}
+                    </span>
+                    <span className="text-[#1a1612]/40">≈</span>
+                    <span className="rounded-full border border-[#c47b2b]/40 bg-white px-2.5 py-1">
+                      {pair.b}
+                    </span>
+                    <span className="text-[#1a1612]/45">
+                      {Math.round(pair.similarity * 100)}%
+                    </span>
+                    <button
+                      type="button"
+                      disabled={merging}
+                      onClick={() => {
+                        setMergePair([pair.a, pair.b]);
+                      }}
+                      className="rounded-full border border-[#8b4513]/30 px-2.5 py-1 text-[#8b4513]"
+                    >
+                      統合する
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {unclassified.length > 0 ? (
+            <div className="space-y-2 rounded-xl border border-[#1a1612]/15 bg-[#1a1612]/4 px-3 py-3">
+              <h3 className="text-sm font-medium text-[#1a1612]/70">
+                未分類 / 要確認（{unclassified.length}）
+              </h3>
+              <p className="text-xs text-[#1a1612]/45">
+                自動では好みに追加しません。問題なければ「統」で確定名とマージできます。
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {unclassified.map((item) => {
+                  const inMerge = mergePair.includes(item.name);
+                  return (
+                    <div
+                      key={item.name}
+                      className="flex max-w-full flex-col gap-1"
+                    >
+                      <div className="flex items-center gap-1">
+                        <span className="rounded-full border border-dashed border-[#1a1612]/25 bg-white px-3 py-1.5 text-xs text-[#1a1612]/70">
+                          {item.name}
+                        </span>
+                        <button
+                          type="button"
+                          title="統合用に選択"
+                          onClick={() => toggleMergeTag(item.name)}
+                          className={`rounded-full px-2 py-1 text-[10px] transition ${
+                            inMerge
+                              ? "bg-[#8b4513] text-white"
+                              : "border border-[#1a1612]/10 text-[#1a1612]/45"
+                          }`}
+                        >
+                          統
+                        </button>
+                      </div>
+                      <span className="px-1 text-[10px] text-[#1a1612]/40">
+                        {item.reasons.join(" / ")}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
 
           {mergePair.length > 0 ? (
             <div className="space-y-2 rounded-xl border border-[#8b4513]/25 bg-[#8b4513]/5 px-3 py-3">
@@ -399,7 +517,7 @@ export function PlaylistAnalyzePanel({
             </div>
           ) : (
             <p className="text-xs text-[#1a1612]/45">
-              表記ゆれをまとめるときは、タグ横の「統」で2つ選び、正式名側のボタンを押します（辞書へ自動追記）。
+              表記ゆれはオレンジ枠の「もしかして同じ？」か、タグ横の「統」から統合できます（辞書へ自動追記）。
             </p>
           )}
 
@@ -411,7 +529,7 @@ export function PlaylistAnalyzePanel({
           >
             {adding
               ? "追加中…"
-              : `選択した ${pickedArtists.length} 件を好きなアーティストに追加`}
+              : `確定から選んだ ${pickedArtists.length} 件を好きなアーティストに追加`}
           </button>
 
           <p className="text-xs text-[#1a1612]/45">
