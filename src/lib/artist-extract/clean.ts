@@ -2,6 +2,8 @@
  * ステップA: 抽出直後のチャンネル名／候補クリーニング
  */
 
+import { countNormalChars, stripDecorativeChars } from "./chars";
+
 const KANA_ONLY = /^[\u3040-\u309f\u30a0-\u30ff\uff66-\uff9dーｰ\s]+$/;
 
 function isKanaOnly(text: string): boolean {
@@ -39,8 +41,6 @@ function stripChannelDecorations(raw: string): string {
 
 /**
  * 「本体名-ふりがな」形式: 2番目がかなのみなら読みとみなして除去
- * 例: 天月-あまつき → 天月
- *     天月-あまつき-YouTube（YouTube除去後）→ 天月
  */
 function stripFuriganaHyphen(raw: string): string {
   const parts = raw
@@ -50,7 +50,6 @@ function stripFuriganaHyphen(raw: string): string {
 
   if (parts.length < 2) return raw.trim();
 
-  // 2番目がかなのみ → 本体は先頭
   if (isKanaOnly(parts[1])) {
     return parts[0];
   }
@@ -70,12 +69,19 @@ export function cleanExtractedName(raw: string): string {
   name = name.replace(/【([^】]*)】/g, "$1");
   name = name.replace(/\[([^\]]*)\]/g, "$1");
 
+  // 絵文字・装飾記号を除去
+  name = stripDecorativeChars(name);
+
   name = stripChannelDecorations(name);
   name = stripFuriganaHyphen(name);
-  // ふりがな除去後にもう一度サフィックス（順序の揺れ対策）
   name = stripChannelDecorations(name);
 
   name = name.replace(/\s+/g, " ").trim();
+
+  // 装飾除去後に通常文字がほぼ無い → 候補破棄
+  if (countNormalChars(name) <= 1) {
+    return "";
+  }
 
   if (!name || /^(official|music|topic|release|channel|youtube)$/i.test(name)) {
     return "";

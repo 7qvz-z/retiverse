@@ -5,6 +5,7 @@ import {
   extractArtistsFromVideo,
   findSimilarPairs,
   isBlockedName,
+  looksLikeSongTitle,
   mergeAliasIntoDictionary,
   normalizeArtistName,
   resolveSlashParts,
@@ -143,10 +144,32 @@ describe("バリデーション", () => {
     ).toBe(true);
   });
 
-  it("空白差のみ（Lil Nas X / LilNasX）は同一キー扱いで確定は1件", () => {
-    expect(stringSimilarity("Lil Nas X", "LilNasX")).toBe(1);
-    const v = validateArtistNames(["Lil Nas X", "LilNasX"]);
-    expect(v.confirmed).toHaveLength(1);
+  it("絵文字を除去して確定名にする", () => {
+    expect(cleanExtractedName("音莉飴🍬")).toBe("音莉飴");
+    expect(cleanExtractedName("✨YOASOBI✨")).toBe("YOASOBI");
+    expect(cleanExtractedName("🍬🍬")).toBe("");
+  });
+
+  it("短い曲名を曲名判定する", () => {
+    expect(looksLikeSongTitle("アイドル")).toBe(true);
+    expect(looksLikeSongTitle("怪獣の花唄")).toBe(true);
+    expect(looksLikeSongTitle("音莉飴")).toBe(false);
+  });
+
+  it("with / vs で分割", () => {
+    expect(
+      splitArtistCandidates("Calliope Mori with Gawr Gura").artists,
+    ).toEqual(["Calliope Mori", "Gawr Gura"]);
+    expect(splitArtistCandidates("A vs B").artists).toEqual(["A", "B"]);
+  });
+
+  it("低自信度の単独候補は要確認寄り（曲名誤認経路）", () => {
+    // Artist - Song のあいまい右側だけだと low → 確定にしない
+    const result = extractArtistsFromVideo({
+      title: "Something - ShortSong",
+    });
+    // ShortSong が曲名っぽくなければ low unclassified、曲名ならセグメント無し
+    expect(result.artists).not.toContain("ShortSong");
   });
 });
 

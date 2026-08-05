@@ -160,10 +160,131 @@ export function PlaylistAnalyzePanel({
       );
       setMergePair([]);
       setMessage(
-        `「${mergeFrom}」を「${canonical}」に統合し、辞書へ追記しました`,
+        `「${mergeFrom}」を「${canonical}」に統合し、修正として保存しました`,
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "統合に失敗しました");
+    } finally {
+      setMerging(false);
+    }
+  }
+
+  async function postCorrection(body: {
+    kind: "reject" | "rename" | "confirm" | "split" | "alias";
+    rawName: string;
+    canonicalName?: string;
+    splitInto?: string[];
+  }) {
+    const res = await fetch("/api/artist-corrections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = (await res.json()) as { error?: string };
+    if (!res.ok) throw new Error(data.error ?? "修正の保存に失敗しました");
+  }
+
+  async function handleReject(name: string) {
+    setMerging(true);
+    setError(null);
+    try {
+      await postCorrection({ kind: "reject", rawName: name });
+      setArtistNames((prev) => prev.filter((n) => n !== name));
+      setUnclassified((prev) => prev.filter((u) => u.name !== name));
+      setPickedArtists((prev) => prev.filter((n) => n !== name));
+      setSimilarPairs((prev) =>
+        prev.filter((p) => p.a !== name && p.b !== name),
+      );
+      setMessage(`「${name}」を除外として保存しました`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "除外に失敗しました");
+    } finally {
+      setMerging(false);
+    }
+  }
+
+  async function handleRename(name: string) {
+    const next = window.prompt(`「${name}」の正しい表記`, name)?.trim();
+    if (!next || next === name) return;
+    setMerging(true);
+    setError(null);
+    try {
+      await postCorrection({
+        kind: "rename",
+        rawName: name,
+        canonicalName: next,
+      });
+      setArtistNames((prev) => {
+        const s = new Set(prev.filter((n) => n !== name));
+        s.add(next);
+        return [...s].sort((a, b) => a.localeCompare(b, "ja"));
+      });
+      setUnclassified((prev) => prev.filter((u) => u.name !== name));
+      setPickedArtists((prev) =>
+        prev.map((n) => (n === name ? next : n)),
+      );
+      setMessage(`「${name}」→「${next}」に修正しました`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "リネームに失敗しました");
+    } finally {
+      setMerging(false);
+    }
+  }
+
+  async function handleSplit(name: string) {
+    const raw = window
+      .prompt(
+        `「${name}」を複数人に分割（カンマ区切り）`,
+        name.includes("・") ? name.split("・").join(",") : "",
+      )
+      ?.trim();
+    if (!raw) return;
+    const parts = raw
+      .split(/[,、]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parts.length < 2) {
+      setError("分割には2つ以上の名前が必要です");
+      return;
+    }
+    setMerging(true);
+    setError(null);
+    try {
+      await postCorrection({
+        kind: "split",
+        rawName: name,
+        splitInto: parts,
+      });
+      setArtistNames((prev) => {
+        const s = new Set(prev.filter((n) => n !== name));
+        for (const p of parts) s.add(p);
+        return [...s].sort((a, b) => a.localeCompare(b, "ja"));
+      });
+      setUnclassified((prev) => prev.filter((u) => u.name !== name));
+      setMessage(`「${name}」を ${parts.length} 名に分割しました`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "分割に失敗しました");
+    } finally {
+      setMerging(false);
+    }
+  }
+
+  async function handleConfirmUnclassified(name: string) {
+    setMerging(true);
+    setError(null);
+    try {
+      await postCorrection({
+        kind: "confirm",
+        rawName: name,
+        canonicalName: name,
+      });
+      setUnclassified((prev) => prev.filter((u) => u.name !== name));
+      setArtistNames((prev) =>
+        [...new Set([...prev, name])].sort((a, b) => a.localeCompare(b, "ja")),
+      );
+      setMessage(`「${name}」を確定タグに昇格しました`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "昇格に失敗しました");
     } finally {
       setMerging(false);
     }
@@ -392,7 +513,7 @@ export function PlaylistAnalyzePanel({
                   const inMerge = mergePair.includes(artist);
                   const maybeSame = similarNameSet.has(artist);
                   return (
-                    <div key={artist} className="flex items-center gap-1">
+                    <div key={artist} className="flex flex-wrap items-center gap-1">
                       <button
                         type="button"
                         onClick={() => toggleArtist(artist)}
@@ -417,6 +538,33 @@ export function PlaylistAnalyzePanel({
                         }`}
                       >
                         統
+                      </button>
+                      <button
+                        type="button"
+                        title="名前を修正"
+                        disabled={merging}
+                        onClick={() => void handleRename(artist)}
+                        className="rounded-full border border-[#1a1612]/10 px-2 py-1 text-[10px] text-[#1a1612]/45"
+                      >
+                        改
+                      </button>
+                      <button
+                        type="button"
+                        title="複数人に分割"
+                        disabled={merging}
+                        onClick={() => void handleSplit(artist)}
+                        className="rounded-full border border-[#1a1612]/10 px-2 py-1 text-[10px] text-[#1a1612]/45"
+                      >
+                        分
+                      </button>
+                      <button
+                        type="button"
+                        title="除外"
+                        disabled={merging}
+                        onClick={() => void handleReject(artist)}
+                        className="rounded-full border border-[#b42318]/20 px-2 py-1 text-[10px] text-[#b42318]"
+                      >
+                        ×
                       </button>
                     </div>
                   );
@@ -478,10 +626,19 @@ export function PlaylistAnalyzePanel({
                       key={item.name}
                       className="flex max-w-full flex-col gap-1"
                     >
-                      <div className="flex items-center gap-1">
+                      <div className="flex flex-wrap items-center gap-1">
                         <span className="rounded-full border border-dashed border-[#1a1612]/25 bg-white px-3 py-1.5 text-xs text-[#1a1612]/70">
                           {item.name}
                         </span>
+                        <button
+                          type="button"
+                          title="確定に昇格"
+                          disabled={merging}
+                          onClick={() => void handleConfirmUnclassified(item.name)}
+                          className="rounded-full border border-[#2a6f6a]/30 px-2 py-1 text-[10px] text-[#2a6f6a]"
+                        >
+                          確
+                        </button>
                         <button
                           type="button"
                           title="統合用に選択"
@@ -493,6 +650,33 @@ export function PlaylistAnalyzePanel({
                           }`}
                         >
                           統
+                        </button>
+                        <button
+                          type="button"
+                          title="名前を修正"
+                          disabled={merging}
+                          onClick={() => void handleRename(item.name)}
+                          className="rounded-full border border-[#1a1612]/10 px-2 py-1 text-[10px] text-[#1a1612]/45"
+                        >
+                          改
+                        </button>
+                        <button
+                          type="button"
+                          title="複数人に分割"
+                          disabled={merging}
+                          onClick={() => void handleSplit(item.name)}
+                          className="rounded-full border border-[#1a1612]/10 px-2 py-1 text-[10px] text-[#1a1612]/45"
+                        >
+                          分
+                        </button>
+                        <button
+                          type="button"
+                          title="除外"
+                          disabled={merging}
+                          onClick={() => void handleReject(item.name)}
+                          className="rounded-full border border-[#b42318]/20 px-2 py-1 text-[10px] text-[#b42318]"
+                        >
+                          ×
                         </button>
                       </div>
                       <span className="px-1 text-[10px] text-[#1a1612]/40">
@@ -532,7 +716,7 @@ export function PlaylistAnalyzePanel({
             </div>
           ) : (
             <p className="text-xs text-[#1a1612]/45">
-              表記ゆれはオレンジ枠の「もしかして同じ？」か、タグ横の「統」から統合できます（辞書へ自動追記）。
+              統=統合 / 改=リネーム / 分=分割 / ×=除外 / 確=要確認から昇格。修正はユーザーごとに保存され、次回解析に反映されます。
             </p>
           )}
 

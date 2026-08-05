@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  applyArtistCorrections,
+  type ArtistCorrection,
+} from "@/lib/artist-extract/corrections";
 import { createClient } from "@/lib/supabase/server";
 import {
   buildPlaylistAnalysis,
@@ -60,10 +64,34 @@ export async function POST(request: Request) {
       videos.push(...items);
     }
 
-    const analysis = buildPlaylistAnalysis(
+    let analysis = buildPlaylistAnalysis(
       selected.map((p) => ({ id: p.id, title: p.title })),
       videos,
     );
+
+    const { data: correctionRows } = await supabase
+      .from("artist_corrections")
+      .select("kind, raw_name, canonical_name, split_into")
+      .eq("user_id", session.user.id)
+      .order("created_at", { ascending: true })
+      .limit(500);
+
+    if (correctionRows && correctionRows.length > 0) {
+      const applied = applyArtistCorrections(
+        {
+          confirmed: analysis.artists,
+          unclassified: analysis.unclassifiedArtists ?? [],
+          similarPairs: analysis.similarPairs ?? [],
+        },
+        correctionRows as ArtistCorrection[],
+      );
+      analysis = {
+        ...analysis,
+        artists: applied.confirmed,
+        unclassifiedArtists: applied.unclassified,
+        similarPairs: applied.similarPairs,
+      };
+    }
 
     const { error: updateError } = await supabase
       .from("profiles")

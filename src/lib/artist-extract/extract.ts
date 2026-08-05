@@ -1,21 +1,32 @@
 /**
  * タイトル・チャンネル名からアーティスト候補文字列を抜き出す
- * 優先度の高いパターンから順に試す
  */
 
 import { cleanChannelName, cleanExtractedName } from "./clean";
 
 const CJK = /[\u3040-\u30ff\u4e00-\u9fff\uff66-\uff9d]/;
+const HIRAGANA = /[\u3040-\u309f]/g;
 
 export type ExtractHints = {
-  /** 抽出できた生文字列（まだ分割前） */
   segments: string[];
-  /** ルールの自信度 */
   confidence: "high" | "low";
 };
 
 const TITLE_JUNK =
   /Official\s*(Music\s*)?(Video|Audio)|Music\s*Video|\bMV\b|公式\s*MV|カバー|cover|踊ってみた/gi;
+
+/** 短い曲名としても既知のもの（アーティスト誤認防止） */
+const KNOWN_SONG_TITLES = new Set([
+  "アイドル",
+  "idol",
+  "怪獣の花唄",
+  "夜に駆ける",
+  "群青",
+  "炎",
+  "ドライフラワー",
+  "残響散歌",
+  "柠檬",
+]);
 
 function stripDecorations(text: string): string {
   return text
@@ -26,19 +37,29 @@ function stripDecorations(text: string): string {
     .trim();
 }
 
-function looksLikeSongTitle(name: string): boolean {
+export function looksLikeSongTitle(name: string): boolean {
   const t = name.trim();
+  if (!t) return false;
+  if (KNOWN_SONG_TITLES.has(t.toLowerCase()) || KNOWN_SONG_TITLES.has(t)) {
+    return true;
+  }
   if (t.length >= 12) return true;
   if ((t.match(/[をがにとへでもはの]/g) ?? []).length >= 2) return true;
-  if (/の歌$|の曲$|テーマ$|ソング$/i.test(t)) return true;
-  if (/^アイドル$/i.test(t) || /^idol$/i.test(t)) return true;
+  if (/の歌$|の曲$|テーマ$|ソング$|の唄$/i.test(t)) return true;
+  if (/[〜～！？!?…]/.test(t)) return true;
+  if (/\b(?:feat\.?|ft\.?|featuring)\b/i.test(t)) return true;
+  // ひらがな比率が高い短いフレーズは曲名っぽい
+  const hira = (t.match(HIRAGANA) ?? []).length;
+  if (t.length >= 4 && t.length <= 10 && hira / t.length >= 0.7) {
+    return true;
+  }
   return false;
 }
 
 function looksLikeArtistToken(name: string): boolean {
   const t = name.trim();
   if (!t || t.length > 40) return false;
-  if (looksLikeSongTitle(t) && t.length > 16) return false;
+  if (looksLikeSongTitle(t)) return false;
   return true;
 }
 
@@ -69,8 +90,6 @@ export function resolveSlashParts(left: string, right: string): string[] {
   const rightArtist =
     looksLikeArtistToken(rightClean) && rightClean.length <= 24;
 
-  // 陽キャJKに憧れる陰キャJKの歌/音莉飴
-  // ロウワー / 星街すいせい(cover)
   if (leftSong && rightArtist) return [rightClean || r];
   if (
     l.length <= 12 &&
@@ -87,18 +106,15 @@ export function resolveSlashParts(left: string, right: string): string[] {
     rightClean.length <= 24 &&
     hasCjk(rightClean)
   ) {
-    // 短い曲名 / 日本語アーティスト
     return [rightClean];
   }
 
-  // 漢字 / ローマ字
   if (hasCjk(l) && isLatinHeavy(rightClean)) return [l];
   if (hasCjk(rightClean) && isLatinHeavy(l)) return [rightClean];
 
   return [l, rightClean || r];
 }
 
-/** チャンネル名のサフィックス除去（ステップA） */
 export { cleanChannelName, cleanExtractedName };
 
 /**
@@ -111,16 +127,13 @@ export function extractTitleSegments(title: string): {
   const raw = title.normalize("NFKC").trim();
   if (!raw) return { segments: [], confidence: "low" };
 
-  // 1. 【】は無視（中身も捨てる）
-  let work = stripDecorations(raw);
+  const work = stripDecorations(raw);
 
-  // 2. アーティスト「曲名」
   const jpQuoted = work.match(/^(.{1,40}?)[「『]([^」』]+)[」』]/);
   if (jpQuoted?.[1] && !looksLikeSongTitle(jpQuoted[1])) {
     return { segments: [jpQuoted[1].trim()], confidence: "high" };
   }
 
-  // 3. 「曲名」 - Artist x Artist （ORIGINAL SONG MV 系）
   const afterQuoteDash = work.match(
     /[「『][^」』]+[」』]\s*[-–—]\s*(.+)$/,
   );
@@ -129,53 +142,46 @@ export function extractTitleSegments(title: string): {
     if (seg) return { segments: [seg], confidence: "high" };
   }
 
-  // 4. 曲名/アーティスト or 漢字/ローマ字
   const slash = work.match(/^(.+?)\s*[/／]\s*(.+)$/);
   if (slash?.[1] && slash[2]) {
-    let right = slash[2].replace(TITLE_JUNK, " ").trim();
-    // feat. が左に残っている場合: 陰キャ...feat.弱酸性 /音莉飴
+    const right = slash[2].replace(TITLE_JUNK, " ").trim();
     const left = slash[1].trim();
     const featInLeft = left.match(/\s+(?:feat\.?|ft\.?|featuring)\s+(.+)$/i);
     const resolved = resolveSlashParts(
       featInLeft ? left.slice(0, featInLeft.index).trim() : left,
       right,
     );
-    const segments: string[] = [...resolved];
-    if (featInLeft?.[1]) {
-      // feat. ゲストも候補に（本家が右のとき）
-      const guest = featInLeft[1].replace(TITLE_JUNK, " ").trim();
-      if (guest && looksLikeArtistToken(guest)) {
-        // テストケース1は音莉飴のみ。feat.ゲストは「弱い」追加にしない
-        // ケース「feat.弱酸性 /音莉飴」では本家=音莉飴が主。ゲストは後段で必要なら
-      }
-    }
-    if (segments.length > 0) {
-      return { segments, confidence: "high" };
+    if (resolved.length > 0) {
+      return { segments: resolved, confidence: "high" };
     }
   }
 
-  // 5. Artist - Song / Song - Artist1 x Artist2
   const dash = work.match(/^(.{1,80}?)\s*[-–—]\s*(.{1,120})$/);
   if (dash?.[1] && dash[2]) {
     const left = dash[1].replace(TITLE_JUNK, " ").trim();
     const right = dash[2].replace(TITLE_JUNK, " ").trim();
-    // 右側に x コラボがある → アーティスト列
-    if (/\sx\s|[×✕]/i.test(right)) {
+    if (/\sx\s|[×✕]|\s+with\s+|\s+vs\.?\s+/i.test(right)) {
       return { segments: [right], confidence: "high" };
     }
-    // 左が短くアーティスト、右が曲
-    if (left.length <= 24 && looksLikeArtistToken(left) && looksLikeSongTitle(right)) {
+    if (
+      left.length <= 24 &&
+      looksLikeArtistToken(left) &&
+      looksLikeSongTitle(right)
+    ) {
       return { segments: [left], confidence: "high" };
     }
-    // 右がアーティストっぽい
-    if (right.length <= 40 && looksLikeArtistToken(right)) {
+    // 右側がアーティストっぽくても low → 単独では確定タグにしない
+    if (
+      right.length <= 40 &&
+      looksLikeArtistToken(right) &&
+      !looksLikeSongTitle(right)
+    ) {
       return { segments: [right], confidence: "low" };
     }
   }
 
-  // 6. by Artist
   const byMatch = work.match(/\s+by\s+(.{1,40})$/i);
-  if (byMatch?.[1]) {
+  if (byMatch?.[1] && !looksLikeSongTitle(byMatch[1])) {
     return { segments: [byMatch[1].trim()], confidence: "high" };
   }
 

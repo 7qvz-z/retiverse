@@ -1,4 +1,5 @@
 import blocklistJson from "./blocklist.json";
+import { DECORATIVE, NORMAL_CHAR, countNormalChars } from "./chars";
 import { dictKey } from "./normalize";
 
 export type UnclassifiedItem = {
@@ -43,13 +44,6 @@ const BLOCK_PATTERNS: RegExp[] = [
   /^hybe(\s*labels)?$/i,
 ];
 
-const NORMAL_CHAR =
-  /[a-zA-Z0-9\u3040-\u30ff\u4e00-\u9fff\uff66-\uff9d]/g;
-
-/** 装飾的 unicode（絵文字・記号類のおおまかな範囲） */
-const DECORATIVE =
-  /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}★☆♪♫♥♡◆◇■□●○※…〜～【】『』「」〈〉《》]/u;
-
 export function isBlockedName(name: string): boolean {
   const t = name.trim();
   if (!t) return true;
@@ -70,10 +64,10 @@ export function detectAnomalies(name: string): string[] {
     reasons.push("1〜2文字の断片");
   }
 
-  const normalMatches = t.match(NORMAL_CHAR) ?? [];
-  const normalCount = normalMatches.length;
+  const normalCount = countNormalChars(t);
   const ratio = normalCount / Math.max(t.length, 1);
 
+  // clean 後でも残る装飾があれば検出（通常は clean で除去済み）
   if (DECORATIVE.test(t) && normalCount <= 2) {
     reasons.push("装飾文字が多く通常文字が少ない");
   }

@@ -6,13 +6,16 @@ import {
 } from "./extract";
 import {
   ALIAS_DICTIONARY,
+  buildAliasLookup,
   normalizeArtistName,
   type AliasDictionary,
   type ArtistDict,
   ARTIST_DICT,
+  dictKey,
 } from "./normalize";
 import { splitArtistCandidates } from "./split";
 import {
+  isBlockedName,
   validateArtistNames,
   type SimilarPair,
   type UnclassifiedItem,
@@ -29,12 +32,20 @@ export type ArtistExtractInput = {
 };
 
 export type ArtistExtractResult = {
-  /** 確定タグ（後方互換） */
   artists: string[];
   unclassified: UnclassifiedItem[];
   similarPairs: SimilarPair[];
   confidence: "high" | "low";
   source: "rules" | "claude";
+};
+
+/** 候補の由来（採用基準用） */
+export type CandidateMeta = {
+  name: string;
+  fromChannel: boolean;
+  highConfidence: boolean;
+  aliasHit: boolean;
+  occurrences: number;
 };
 
 function resolveDictionary(input: ArtistExtractInput): AliasDictionary {
@@ -56,25 +67,31 @@ type Collected = {
   unclassified: UnclassifiedItem[];
 };
 
-/**
- * 抽出 → Aクリーニング → 厳格分割 → B正規化（バリデーション前）
- */
 function collectFromSegments(
   segments: string[],
   dictionary: AliasDictionary,
 ): Collected {
   const names: string[] = [];
   const unclassified: UnclassifiedItem[] = [];
+  const lookup = buildAliasLookup(dictionary);
 
   for (const seg of segments) {
     const cleanedSeg = cleanExtractedName(seg);
     if (!cleanedSeg) continue;
 
-    const split = splitArtistCandidates(cleanedSeg);
-    for (const part of split.discarded) {
-      // feat. 欠落などは破棄（表示しない）
-      void part;
+    // 中黒のみで繋がる曖昧名は未分類へ（split 側が条件付き分割）
+    if (
+      (cleanedSeg.includes("・") || cleanedSeg.includes("･")) &&
+      cleanedSeg.split(/[・･]/).length > 2
+    ) {
+      unclassified.push({
+        name: cleanedSeg,
+        reasons: ["中黒区切りが複雑で自動分割を保留"],
+      });
+      continue;
     }
+
+    const split = splitArtistCandidates(cleanedSeg);
     for (const part of split.unclassified) {
       const cleaned = cleanExtractedName(part);
       if (cleaned) {
@@ -88,7 +105,10 @@ function collectFromSegments(
       const cleaned = cleanExtractedName(part);
       if (!cleaned) continue;
       const normalized = normalizeArtistName(cleaned, dictionary);
-      if (normalized) names.push(normalized);
+      if (!normalized) continue;
+      // aliasHit は呼び出し側で判定
+      void lookup;
+      names.push(normalized);
     }
   }
 
@@ -109,13 +129,17 @@ function toResult(
   };
 }
 
-/**
- * 動画メタデータからアーティスト名を抽出する
- * 抽出 → 分割 → 正規化 → バリデーション
- */
-export function extractArtistsFromVideo(
+type VideoExtract = {
+  highNames: string[];
+  lowNames: string[];
+  channelNames: string[];
+  unclassified: UnclassifiedItem[];
+  confidence: "high" | "low";
+};
+
+function extractVideoCandidates(
   input: ArtistExtractInput,
-): ArtistExtractResult {
+): VideoExtract {
   const dictionary = resolveDictionary(input);
   const title = input.title?.trim() ?? "";
   const channelTitle = input.channelTitle?.trim() ?? "";
@@ -127,64 +151,169 @@ export function extractArtistsFromVideo(
     ? extractChannelSegments(channelTitle)
     : { segments: [] as string[], confidence: "low" as const };
 
-  let segments: string[] = [];
-  let confidence: "high" | "low" = "low";
+  const highSegs =
+    fromTitle.confidence === "high" ? fromTitle.segments : [];
+  const lowSegs =
+    fromTitle.confidence === "low" ? fromTitle.segments : [];
 
-  if (fromTitle.segments.length > 0 && fromTitle.confidence === "high") {
-    segments = fromTitle.segments;
-    confidence = "high";
-  } else if (fromChannel.segments.length > 0) {
-    segments = fromChannel.segments;
-    confidence = fromChannel.confidence;
-    if (fromTitle.segments.length > 0) {
-      segments = [...fromTitle.segments, ...fromChannel.segments];
+  const high = collectFromSegments(highSegs, dictionary);
+  const low = collectFromSegments(lowSegs, dictionary);
+  const channel = collectFromSegments(fromChannel.segments, dictionary);
+
+  let confidence: "high" | "low" = "low";
+  if (highSegs.length > 0) confidence = "high";
+  else if (fromChannel.segments.length > 0) confidence = "high";
+  else if (lowSegs.length > 0) confidence = "low";
+
+  return {
+    highNames: high.names,
+    lowNames: low.names,
+    channelNames: channel.names,
+    unclassified: [
+      ...high.unclassified,
+      ...low.unclassified,
+      ...channel.unclassified,
+    ],
+    confidence,
+  };
+}
+
+/**
+ * 単一動画: high/channel は確定候補、low のみは要確認
+ */
+export function extractArtistsFromVideo(
+  input: ArtistExtractInput,
+): ArtistExtractResult {
+  const dictionary = resolveDictionary(input);
+  const lookup = buildAliasLookup(dictionary);
+  const extracted = extractVideoCandidates(input);
+
+  const confirmedSeed: string[] = [];
+  const weak: UnclassifiedItem[] = [];
+
+  const pushConfirmed = (name: string) => {
+    if (!isBlockedName(name)) confirmedSeed.push(name);
+  };
+
+  for (const name of extracted.channelNames) pushConfirmed(name);
+  for (const name of extracted.highNames) pushConfirmed(name);
+
+  for (const name of extracted.lowNames) {
+    // エイリアスヒットなら確定扱い
+    if (lookup.has(dictKey(name))) {
+      pushConfirmed(name);
+      continue;
     }
-  } else if (fromTitle.segments.length > 0) {
-    segments = fromTitle.segments;
-    confidence = fromTitle.confidence;
+    // low 単独は確定にしない
+    if (!extracted.channelNames.includes(name) && !extracted.highNames.includes(name)) {
+      weak.push({
+        name,
+        reasons: ["低自信度のタイトル抽出（単独では未確定）"],
+      });
+    }
   }
 
-  const collected = collectFromSegments(segments, dictionary);
-  const validation = validateArtistNames(
-    collected.names,
-    collected.unclassified,
-  );
+  const validation = validateArtistNames(confirmedSeed, [
+    ...extracted.unclassified,
+    ...weak,
+  ]);
 
-  return toResult(validation, confidence, "rules");
+  return toResult(validation, extracted.confidence, "rules");
 }
 
 /**
  * 複数動画分をまとめて検証（PL解析用）
+ * 採用基準:
+ * 1. エイリアス辞書ヒット
+ * 2. チャンネル名由来
+ * 3. confidence high 由来
+ * 4. 2曲以上で出現
  */
 export function aggregateValidatedArtists(
   videos: { title: string; channelTitle: string }[],
   dictionary?: AliasDictionary,
 ): ValidationResult {
-  const score = new Map<string, number>();
+  const dict = dictionary ?? ALIAS_DICTIONARY;
+  const lookup = buildAliasLookup(dict);
+
+  type Acc = {
+    name: string;
+    occurrences: number;
+    fromChannel: boolean;
+    highConfidence: boolean;
+    aliasHit: boolean;
+  };
+
+  const acc = new Map<string, Acc>();
   const unclassifiedMap = new Map<string, UnclassifiedItem>();
 
+  const bump = (
+    name: string,
+    flags: Partial<Omit<Acc, "name" | "occurrences">>,
+  ) => {
+    const k = dictKey(name);
+    const prev = acc.get(k);
+    if (prev) {
+      prev.occurrences += 1;
+      prev.fromChannel ||= Boolean(flags.fromChannel);
+      prev.highConfidence ||= Boolean(flags.highConfidence);
+      prev.aliasHit ||= Boolean(flags.aliasHit) || lookup.has(k);
+    } else {
+      acc.set(k, {
+        name,
+        occurrences: 1,
+        fromChannel: Boolean(flags.fromChannel),
+        highConfidence: Boolean(flags.highConfidence),
+        aliasHit: Boolean(flags.aliasHit) || lookup.has(k),
+      });
+    }
+  };
+
   for (const video of videos) {
-    const result = extractArtistsFromVideo({
+    const extracted = extractVideoCandidates({
       title: video.title,
       channelTitle: video.channelTitle,
-      dictionary,
+      dictionary: dict,
     });
-    for (const name of result.artists) {
-      score.set(name, (score.get(name) ?? 0) + 1);
+
+    for (const name of extracted.channelNames) {
+      bump(name, { fromChannel: true, highConfidence: true });
     }
-    for (const item of result.unclassified) {
-      const prev = unclassifiedMap.get(item.name);
-      if (!prev) unclassifiedMap.set(item.name, item);
+    for (const name of extracted.highNames) {
+      bump(name, { highConfidence: true });
+    }
+    for (const name of extracted.lowNames) {
+      bump(name, { highConfidence: false });
+    }
+    for (const item of extracted.unclassified) {
+      if (!unclassifiedMap.has(item.name)) {
+        unclassifiedMap.set(item.name, item);
+      }
     }
   }
 
-  const names = [...score.entries()]
-    .filter(([, s]) => s >= 1)
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ja"))
-    .slice(0, 60)
-    .map(([name]) => name);
+  const confirmed: string[] = [];
+  for (const item of acc.values()) {
+    if (isBlockedName(item.name)) continue;
 
-  return validateArtistNames(names, [...unclassifiedMap.values()]);
+    const adopt =
+      item.aliasHit ||
+      item.fromChannel ||
+      item.highConfidence ||
+      item.occurrences >= 2;
+
+    if (adopt) {
+      // 異常検出は validate に任せるため一旦リストへ
+      confirmed.push(item.name);
+    } else {
+      unclassifiedMap.set(item.name, {
+        name: item.name,
+        reasons: ["出現1回かつ低自信度のため要確認"],
+      });
+    }
+  }
+
+  return validateArtistNames(confirmed, [...unclassifiedMap.values()]);
 }
 
 export async function extractArtistsFromVideoAsync(
@@ -218,6 +347,7 @@ export {
   extractChannelSegments,
   cleanChannelName,
   resolveSlashParts,
+  looksLikeSongTitle,
 } from "./extract";
 export { cleanExtractedName } from "./clean";
 export { splitArtistCandidates } from "./split";

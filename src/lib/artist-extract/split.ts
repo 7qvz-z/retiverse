@@ -21,7 +21,26 @@ export type SplitResult = {
 };
 
 const COLLAB_SPLIT =
-  /\s*[×✕✖ｘ]\s*|\s+[xX]\s+|\s*[&＆]\s*|\s*[、,]\s*/;
+  /\s*[×✕✖ｘ]\s*|\s+[xX]\s+|\s*[&＆]\s*|\s*[、,]\s*|\s+(?:with|vs\.?|VS)\s+|\s*[+＋]\s*/;
+
+/**
+ * 中黒「・」は誤爆しやすい（ユニット名・複合名）。
+ * 両側が2文字以上かつ、全体が短くない場合のみ分割候補にする。
+ * それ以外は分割せず呼び出し側で人間判断（unclassified）に回す想定。
+ */
+function splitMiddleDotCautiously(text: string): string[] | null {
+  if (!text.includes("・") && !text.includes("･")) return null;
+  const parts = text
+    .split(/\s*[・･]\s*/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length < 2) return null;
+  // 両側が2文字未満なら分割しない（例: A・B のような曖昧ケースは未対応）
+  if (parts.some((p) => p.length < 2)) return null;
+  // 3分割以上は誤爆しやすいので分割しない
+  if (parts.length > 2) return null;
+  return parts;
+}
 
 /** 括弧の開閉が揃っているか */
 export function hasBalancedParens(text: string): boolean {
@@ -100,6 +119,9 @@ export function tryRepairParenFragments(parts: string[]): {
 }
 
 function splitCollabOnly(text: string): string[] {
+  const middle = splitMiddleDotCautiously(text);
+  if (middle) return middle;
+
   if (!COLLAB_SPLIT.test(text)) return [text];
   const parts = text
     .split(COLLAB_SPLIT)
