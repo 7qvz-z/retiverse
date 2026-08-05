@@ -3,6 +3,8 @@
  * 優先度の高いパターンから順に試す
  */
 
+import { cleanChannelName, cleanExtractedName } from "./clean";
+
 const CJK = /[\u3040-\u30ff\u4e00-\u9fff\uff66-\uff9d]/;
 
 export type ExtractHints = {
@@ -96,36 +98,8 @@ export function resolveSlashParts(left: string, right: string): string[] {
   return [l, rightClean || r];
 }
 
-/** チャンネル名のサフィックス除去 */
-export function cleanChannelName(channelTitle: string): string | null {
-  let name = channelTitle.normalize("NFKC").trim();
-  if (!name) return null;
-
-  // 【音莉飴】official → 音莉飴
-  name = name.replace(/【([^】]+)】/g, "$1");
-
-  name = name
-    .replace(/\s*-\s*Topic$/i, "")
-    .replace(/\s*VEVO$/i, "")
-    .replace(/\s*-\s*A\.I\.Channel$/i, "")
-    .replace(/\s*-\s*AI\.?Channel$/i, "")
-    .replace(/\s+Ch\.\s*hololive(?:-EN)?$/i, "")
-    .replace(/\s+Ch\..*$/i, "")
-    .replace(/\s*Official.*$/i, "")
-    .replace(/\s*公式.*$/i, "")
-    .replace(/\s+Channel$/i, "")
-    .replace(/\s*Release$/i, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  // HoneyWorks OFFICIAL
-  name = name.replace(/\s+OFFICIAL$/i, "").trim();
-
-  if (!name || /^(official|music|topic|release|channel)$/i.test(name)) {
-    return null;
-  }
-  return name;
-}
+/** チャンネル名のサフィックス除去（ステップA） */
+export { cleanChannelName, cleanExtractedName };
 
 /**
  * タイトルから候補セグメントを優先順位付きで抽出

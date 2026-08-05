@@ -1,6 +1,6 @@
+import { extractArtistsFromVideo } from "@/lib/artist-extract";
 import type { PlaylistAnalysis } from "@/lib/playlist/analysis-types";
 import { isExcludedNonSongTitle } from "@/lib/playlist/filters";
-import { rankArtistsFromVideos } from "@/lib/playlist/extract-artists";
 
 type PlaylistListItem = {
   id?: string;
@@ -132,14 +132,12 @@ export async function listPlaylistVideoSnippets(
   return videos;
 }
 
-/** @deprecated extract-artists の scoreArtistHints を使用 */
+/** @deprecated artist-extract の extractArtistsFromVideo を使用 */
 export function extractArtistHints(
   title: string,
   channelTitle: string,
 ): string[] {
-  return rankArtistsFromVideos([{ title, channelTitle, videoId: "x" }], 10).map(
-    (a) => a.name,
-  );
+  return extractArtistsFromVideo({ title, channelTitle }).artists;
 }
 
 export function buildPlaylistAnalysis(
@@ -163,7 +161,26 @@ export function buildPlaylistAnalysis(
     }
   }
 
-  const ranked = rankArtistsFromVideos(videos, 40);
+  const artistScores = new Map<string, number>();
+  for (const video of videos) {
+    const { artists } = extractArtistsFromVideo({
+      title: video.title,
+      channelTitle: video.channelTitle,
+    });
+    for (const name of artists) {
+      artistScores.set(name, (artistScores.get(name) ?? 0) + 1);
+    }
+  }
+
+  const artists = [...artistScores.entries()]
+    .filter(([, score]) => score >= 1)
+    .sort(
+      (a, b) =>
+        b[1] - a[1] || a[0].localeCompare(b[0], "ja"),
+    )
+    .slice(0, 40)
+    .map(([name]) => name)
+    .sort((a, b) => a.localeCompare(b, "ja"));
 
   const channels = [...channelCounts.entries()]
     .sort((a, b) => b[1] - a[1])
@@ -173,7 +190,7 @@ export function buildPlaylistAnalysis(
   return {
     playlistIds: playlistMeta.map((p) => p.id),
     playlistTitles: playlistMeta.map((p) => p.title),
-    artists: ranked.map((a) => a.name),
+    artists,
     channels,
     sampleTitles,
     videoIds: [...new Set(videoIds)].slice(0, 300),

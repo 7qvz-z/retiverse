@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   cleanChannelName,
+  cleanExtractedName,
   extractArtistsFromVideo,
+  mergeAliasIntoDictionary,
+  normalizeArtistName,
   resolveSlashParts,
   splitArtistCandidates,
 } from "./index";
@@ -53,7 +56,47 @@ describe("extractArtistsFromVideo — 必須ケース", () => {
   });
 });
 
-describe("ユニット: slash / split / channel", () => {
+describe("ステップA: チャンネル名クリーニング", () => {
+  it("天月-あまつき-YouTube → 天月", () => {
+    expect(cleanExtractedName("天月-あまつき-YouTube")).toBe("天月");
+  });
+
+  it("【音莉飴】official → 音莉飴", () => {
+    expect(cleanExtractedName("【音莉飴】official")).toBe("音莉飴");
+  });
+
+  it("末尾 YouTube / Official / 公式チャンネル", () => {
+    expect(cleanExtractedName("誰か - YouTube")).toBe("誰か");
+    expect(cleanExtractedName("誰か(YouTube)")).toBe("誰か");
+    expect(cleanExtractedName("HoneyWorks OFFICIAL")).toBe("HoneyWorks");
+    expect(cleanExtractedName("アーティスト公式チャンネル")).toBe(
+      "アーティスト",
+    );
+  });
+
+  it("チャンネル掃除", () => {
+    expect(cleanChannelName("Kizuna AI - A.I.Channel")).toBe("Kizuna AI");
+  });
+});
+
+describe("ステップB: エイリアス正規化", () => {
+  it("辞書照合で canonical に置換", () => {
+    expect(normalizeArtistName("Hatsuboshi Gakuen")).toBe("初星学園");
+    expect(normalizeArtistName("suisei")).toBe("星街すいせい");
+  });
+
+  it("手動マージを辞書に反映", () => {
+    const next = mergeAliasIntoDictionary(
+      { 天月: ["あまつき"] },
+      "天月",
+      "Amatsuki",
+    );
+    expect(next["天月"]).toContain("Amatsuki");
+    expect(next["天月"]).toContain("あまつき");
+  });
+});
+
+describe("ユニット: slash / split", () => {
   it("曲名/アーティストは右側", () => {
     expect(
       resolveSlashParts("陽キャJKに憧れる陰キャJKの歌", "音莉飴"),
@@ -74,11 +117,5 @@ describe("ユニット: slash / split / channel", () => {
 
   it("GILTY×GILTY は分割しない", () => {
     expect(splitArtistCandidates("GILTY×GILTY")).toEqual(["GILTY×GILTY"]);
-  });
-
-  it("チャンネル掃除", () => {
-    expect(cleanChannelName("Kizuna AI - A.I.Channel")).toBe("Kizuna AI");
-    expect(cleanChannelName("【音莉飴】official")).toBe("音莉飴");
-    expect(cleanChannelName("HoneyWorks OFFICIAL")).toBe("HoneyWorks");
   });
 });

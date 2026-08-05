@@ -23,6 +23,8 @@ export function PlaylistAnalyzePanel({
     initialAnalysis,
   );
   const [pickedArtists, setPickedArtists] = useState<string[]>([]);
+  const [mergePair, setMergePair] = useState<string[]>([]);
+  const [merging, setMerging] = useState(false);
   const [loadingList, setLoadingList] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -53,12 +55,17 @@ export function PlaylistAnalyzePanel({
 
   useEffect(() => {
     setPickedArtists([]);
+    setMergePair([]);
   }, [analysis?.analyzedAt]);
 
-  const allArtistNames = useMemo(() => {
+  const [artistNames, setArtistNames] = useState<string[]>([]);
+
+  useEffect(() => {
     const names = analysis?.artists ?? [];
-    return [...names].sort((a, b) => a.localeCompare(b, "ja"));
+    setArtistNames([...names].sort((a, b) => a.localeCompare(b, "ja")));
   }, [analysis?.artists]);
+
+  const allArtistNames = artistNames;
   const allPicked = useMemo(
     () =>
       allArtistNames.length > 0 &&
@@ -80,6 +87,56 @@ export function PlaylistAnalyzePanel({
       prev.includes(name) ? prev.filter((a) => a !== name) : [...prev, name],
     );
     setMessage(null);
+  }
+
+  function toggleMergeTag(name: string) {
+    setMergePair((prev) => {
+      if (prev.includes(name)) return prev.filter((a) => a !== name);
+      if (prev.length >= 2) return [prev[1], name];
+      return [...prev, name];
+    });
+    setMessage(null);
+  }
+
+  async function handleMerge(canonical: string) {
+    if (mergePair.length !== 2) {
+      setError("統合するにはタグを2つ選んでください");
+      return;
+    }
+    const mergeFrom = mergePair.find((n) => n !== canonical);
+    if (!mergeFrom) {
+      setError("統合元のタグが見つかりません");
+      return;
+    }
+    setMerging(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/artist-aliases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ canonical, mergeFrom }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "統合に失敗しました");
+
+      setArtistNames((prev) =>
+        [...new Set(prev.map((n) => (n === mergeFrom ? canonical : n)))].sort(
+          (a, b) => a.localeCompare(b, "ja"),
+        ),
+      );
+      setPickedArtists((prev) =>
+        [...new Set(prev.map((n) => (n === mergeFrom ? canonical : n)))],
+      );
+      setMergePair([]);
+      setMessage(
+        `「${mergeFrom}」を「${canonical}」に統合し、辞書へ追記しました`,
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "統合に失敗しました");
+    } finally {
+      setMerging(false);
+    }
   }
 
   function selectAllArtists() {
@@ -283,23 +340,68 @@ export function PlaylistAnalyzePanel({
             ) : (
               allArtistNames.map((artist) => {
                 const checked = pickedArtists.includes(artist);
+                const inMerge = mergePair.includes(artist);
                 return (
-                  <button
-                    key={artist}
-                    type="button"
-                    onClick={() => toggleArtist(artist)}
-                    className={`rounded-full px-3 py-1.5 text-xs transition ${
-                      checked
-                        ? "bg-[#2a6f6a] text-white"
-                        : "border border-[#1a1612]/15 bg-white text-[#1a1612]"
-                    }`}
-                  >
-                    {artist}
-                  </button>
+                  <div key={artist} className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleArtist(artist)}
+                      className={`rounded-full px-3 py-1.5 text-xs transition ${
+                        checked
+                          ? "bg-[#2a6f6a] text-white"
+                          : "border border-[#1a1612]/15 bg-white text-[#1a1612]"
+                      }`}
+                    >
+                      {artist}
+                    </button>
+                    <button
+                      type="button"
+                      title="統合用に選択"
+                      onClick={() => toggleMergeTag(artist)}
+                      className={`rounded-full px-2 py-1 text-[10px] transition ${
+                        inMerge
+                          ? "bg-[#8b4513] text-white"
+                          : "border border-[#1a1612]/10 text-[#1a1612]/45"
+                      }`}
+                    >
+                      統
+                    </button>
+                  </div>
                 );
               })
             )}
           </div>
+
+          {mergePair.length > 0 ? (
+            <div className="space-y-2 rounded-xl border border-[#8b4513]/25 bg-[#8b4513]/5 px-3 py-3">
+              <p className="text-xs text-[#1a1612]/65">
+                統合選択（茶色）: {mergePair.join(" ＋ ")}
+                {mergePair.length < 2 ? "（もう1つ選んでください）" : ""}
+              </p>
+              {mergePair.length === 2 ? (
+                <div className="flex flex-wrap gap-2">
+                  <span className="self-center text-xs text-[#1a1612]/55">
+                    正式名にする側:
+                  </span>
+                  {mergePair.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      disabled={merging}
+                      onClick={() => void handleMerge(name)}
+                      className="rounded-full bg-[#8b4513] px-3 py-1.5 text-xs text-white disabled:opacity-40"
+                    >
+                      「{name}」に統合
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <p className="text-xs text-[#1a1612]/45">
+              表記ゆれをまとめるときは、タグ横の「統」で2つ選び、正式名側のボタンを押します（辞書へ自動追記）。
+            </p>
+          )}
 
           <button
             type="button"
