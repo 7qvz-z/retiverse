@@ -271,7 +271,22 @@ export function PlaylistAnalyzePanel({
         >
           一覧を再読み込み
         </button>
-        <p className="text-xs text-[#1a1612]/45">最大5件まで選択できます</p>
+        <button
+          type="button"
+          onClick={() => {
+            setSelected([]);
+            setMessage(null);
+          }}
+          disabled={selected.length === 0}
+          className="rounded-full border border-[#1a1612]/15 px-4 py-2 text-sm disabled:opacity-40"
+        >
+          選択をすべて解除
+          {selected.length > 0 ? `（${selected.length}）` : ""}
+        </button>
+        <p className="text-xs text-[#1a1612]/45">
+          最大5件まで選択できます
+          {selected.length > 0 ? ` · 現在 ${selected.length} 件選択中` : ""}
+        </p>
       </div>
 
       {loadingList ? (
