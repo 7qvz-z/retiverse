@@ -5,13 +5,25 @@ import { persistYouTubeCredentials } from "@/lib/youtube/auth";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
+  const oauthError = searchParams.get("error");
+  const oauthErrorDescription = searchParams.get("error_description");
   const next = searchParams.get("next") ?? "/";
+
+  if (oauthError) {
+    console.error("[auth/callback] oauth error:", oauthError, oauthErrorDescription);
+    return NextResponse.redirect(`${origin}/login?error=auth`);
+  }
 
   if (code) {
     const supabase = await createClient();
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (!error && data.user && data.session) {
+    if (error) {
+      console.error("[auth/callback] exchangeCodeForSession:", error.message);
+      return NextResponse.redirect(`${origin}/login?error=auth`);
+    }
+
+    if (data.user && data.session) {
       const meta = data.user.user_metadata ?? {};
       await supabase.from("profiles").upsert({
         id: data.user.id,

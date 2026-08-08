@@ -17,8 +17,9 @@ export function GoogleLoginButton({ className }: Props) {
 
     try {
       const supabase = createClient();
-      const siteUrl =
-        process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin;
+      // 本番で env が localhost のままだとログイン後にローカルへ戻ってしまうため、
+      // ブラウザで開いている origin を優先する。
+      const siteUrl = window.location.origin;
 
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",

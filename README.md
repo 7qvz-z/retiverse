@@ -97,7 +97,7 @@ Vercel → Project → Settings → Environment Variables に、ローカルの 
 | `SUPABASE_SECRET_KEY` | サーバー専用。`NEXT_PUBLIC_` を付けない |
 | `YOUTUBE_API_KEY` | サーバー専用 |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Supabase の Google プロバイダと同じ |
-| `NEXT_PUBLIC_SITE_URL` | **`https://<名前>.vercel.app`**（末尾スラッシュなし） |
+| `NEXT_PUBLIC_SITE_URL` | **`https://retiverse.vercel.app`**（末尾スラッシュなし。ローカルの `127.0.0.1` のままにしない） |
 
 `NEXT_PUBLIC_*` はビルド時に埋め込まれるため、変更後は **Redeploy** が必要です。
 
