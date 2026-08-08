@@ -1,5 +1,5 @@
 import blocklistJson from "./blocklist.json";
-import { DECORATIVE, NORMAL_CHAR, countNormalChars } from "./chars";
+import { DECORATIVE, countNormalChars } from "./chars";
 import { dictKey } from "./normalize";
 
 export type UnclassifiedItem = {
@@ -17,6 +17,28 @@ export type ValidationResult = {
   confirmed: string[];
   unclassified: UnclassifiedItem[];
   similarPairs: SimilarPair[];
+};
+
+export type ArtistAdoptedBy =
+  | "alias"
+  | "channel"
+  | "high"
+  | "multi"
+  | "confirm"
+  | "group"
+  | "unit"
+  | "unknown";
+
+export type ArtistEvidence = {
+  name: string;
+  sampleTitle: string | null;
+  sampleChannel: string | null;
+  occurrenceCount: number;
+  adoptedBy: ArtistAdoptedBy;
+};
+
+export type AggregateResult = ValidationResult & {
+  evidence: ArtistEvidence[];
 };
 
 const BLOCKLIST = (blocklistJson as string[]).map((s) => s.trim()).filter(Boolean);

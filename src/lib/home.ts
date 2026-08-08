@@ -55,6 +55,25 @@ export function isEnvironment(value: string): value is EnvironmentTag {
   return ENVIRONMENTS.some((e) => e.id === value);
 }
 
+/** 設定で OFF の季節・天気・時間帯タグを除外する */
+export function filterEnvironmentsByPreferences(
+  environments: EnvironmentTag[],
+  preferences: {
+    considerWeather: boolean;
+    considerSeason: boolean;
+    considerTimeOfDay: boolean;
+  },
+): EnvironmentTag[] {
+  return environments.filter((id) => {
+    const group = ENVIRONMENTS.find((e) => e.id === id)?.group;
+    if (!group) return false;
+    if (group === "weather") return preferences.considerWeather;
+    if (group === "season") return preferences.considerSeason;
+    if (group === "time") return preferences.considerTimeOfDay;
+    return false;
+  });
+}
+
 export function formatRelativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const minutes = Math.floor(diff / 60000);

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ContextHints } from "@/components/home/ContextHints";
 import { ENVIRONMENTS, MOODS } from "@/lib/constants";
@@ -32,14 +32,20 @@ type Props = {
   considerTimeOfDay: boolean;
 };
 
+type EnvGroupKey = "weather" | "time" | "season";
+
 const ENV_GROUPS: {
-  key: "weather" | "time" | "season";
+  key: EnvGroupKey;
   label: string;
 }[] = [
   { key: "weather", label: "天気" },
   { key: "time", label: "時間帯" },
   { key: "season", label: "季節" },
 ];
+
+function envGroupOf(id: EnvironmentTag): EnvGroupKey | null {
+  return ENVIRONMENTS.find((item) => item.id === id)?.group ?? null;
+}
 
 export function HomePanel({
   displayName,
@@ -58,20 +64,47 @@ export function HomePanel({
   const [analysis, setAnalysis] = useState<NoteAnalysis | null>(null);
   const [weather, setWeather] = useState<WeatherSnapshot | null>(null);
 
+  const enabledGroups = useMemo(() => {
+    const groups = new Set<EnvGroupKey>();
+    if (considerWeather) groups.add("weather");
+    if (considerTimeOfDay) groups.add("time");
+    if (considerSeason) groups.add("season");
+    return groups;
+  }, [considerWeather, considerSeason, considerTimeOfDay]);
+
+  const visibleEnvGroups = useMemo(
+    () => ENV_GROUPS.filter((group) => enabledGroups.has(group.key)),
+    [enabledGroups],
+  );
+
+  const isEnvAllowed = useCallback(
+    (id: EnvironmentTag) => {
+      const group = envGroupOf(id);
+      return group !== null && enabledGroups.has(group);
+    },
+    [enabledGroups],
+  );
+
+  // 設定 OFF のグループは選択・天気表示から外す
+  useEffect(() => {
+    setEnvironments((prev) => prev.filter(isEnvAllowed));
+    if (!considerWeather) setWeather(null);
+  }, [considerWeather, isEnvAllowed]);
+
   const canGenerate = moods.length > 0 || otherNote.trim().length > 0;
 
   const handleApplyHints = useCallback(
     (tags: EnvironmentTag[], weatherSnap: WeatherSnapshot | null) => {
-      setWeather(weatherSnap);
+      setWeather(considerWeather ? weatherSnap : null);
       setEnvironments((prev) => {
-        const next = [...prev];
+        const next = prev.filter(isEnvAllowed);
         for (const tag of tags) {
-          if (!next.includes(tag)) next.push(tag);
+          if (isEnvAllowed(tag) && !next.includes(tag)) next.push(tag);
         }
         return next;
       });
     },
-    [],
+    [considerWeather, isEnvAllowed],
   );
 
   const summary = useMemo(() => {
@@ -92,6 +125,7 @@ export function HomePanel({
   }
 
   function toggleEnvironment(id: EnvironmentTag) {
+    if (!isEnvAllowed(id)) return;
     setEnvironments((prev) =>
       prev.includes(id) ? prev.filter((e) => e !== id) : [...prev, id],
     );
@@ -110,9 +144,9 @@ export function HomePanel({
     });
 
     setEnvironments((prev) => {
-      const next = [...prev];
+      const next = prev.filter(isEnvAllowed);
       for (const env of result.environments) {
-        if (!next.includes(env)) next.push(env);
+        if (isEnvAllowed(env) && !next.includes(env)) next.push(env);
       }
       return next;
     });
@@ -120,13 +154,14 @@ export function HomePanel({
 
   function handleGenerate() {
     if (!canGenerate) return;
+    const allowedEnvironments = environments.filter(isEnvAllowed);
     const params = new URLSearchParams();
     if (moods.length > 0) params.set("moods", moods.join(","));
-    if (environments.length > 0) {
-      params.set("environments", environments.join(","));
+    if (allowedEnvironments.length > 0) {
+      params.set("environments", allowedEnvironments.join(","));
     }
     if (otherNote.trim()) params.set("note", otherNote.trim());
-    if (weather) {
+    if (considerWeather && weather) {
       params.set("weather", weather.environment);
       params.set("weatherLabel", weather.label);
     }
@@ -136,23 +171,23 @@ export function HomePanel({
   return (
     <div className="space-y-12">
       <section>
-        <p className="text-sm text-[#1a1612]/55">
+        <p className="text-sm text-[#e8dfd0]/55">
           {displayName ? `${displayName} さん` : "ようこそ"}
         </p>
         <h1 className="mt-2 font-[family-name:var(--font-display)] text-4xl tracking-tight">
           いまの気分は？
         </h1>
-        <p className="mt-3 max-w-xl text-[#1a1612]/65">
+        <p className="mt-3 max-w-xl text-[#e8dfd0]/65">
           気分は複数選べます。環境や「その他」の自由記述も使えます。
         </p>
-        <p className="mt-3 text-xs text-[#1a1612]/45">
+        <p className="mt-3 text-xs text-[#e8dfd0]/45">
           登録済み: アーティスト {artistCount} / ジャンル {genreCount}
           {" · "}
           <Link
             href="/settings/tastes"
-            className="underline underline-offset-2 hover:text-[#1a1612]"
+            className="underline underline-offset-2 hover:text-[#e8dfd0]"
           >
-            好みを編集
+            あなたの音楽スタイルを編集
           </Link>
         </p>
 
@@ -167,7 +202,7 @@ export function HomePanel({
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-sm font-medium tracking-wide text-[#1a1612]/55">
+        <h2 className="text-sm font-medium tracking-wide text-[#e8dfd0]/55">
           気分（複数可）
         </h2>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
@@ -180,8 +215,8 @@ export function HomePanel({
                 onClick={() => toggleMood(item.id)}
                 className={`flex flex-col items-center gap-2 rounded-2xl px-3 py-4 text-center transition ${
                   active
-                    ? "bg-[#1a1612] text-[#f4f0e8]"
-                    : "bg-white/70 text-[#1a1612] hover:bg-white"
+                    ? "bg-[#c9a66b] text-[#0a0b0d]"
+                    : "bg-[#14161c]/85 text-[#e8dfd0] hover:bg-[#1a1d24]"
                 }`}
               >
                 <span className="text-2xl" aria-hidden>
@@ -197,7 +232,7 @@ export function HomePanel({
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-sm font-medium tracking-wide text-[#1a1612]/55">
+        <h2 className="text-sm font-medium tracking-wide text-[#e8dfd0]/55">
           その他（自由記述）
         </h2>
         <textarea
@@ -208,70 +243,90 @@ export function HomePanel({
           }}
           rows={3}
           placeholder="例: 朝の通勤、雨の日に集中したい、ちょっと悲しい…"
-          className="w-full rounded-2xl border border-[#1a1612]/15 bg-white px-4 py-3 text-sm outline-none placeholder:text-[#1a1612]/35 focus:border-[#1a1612]/35"
+          className="w-full rounded-2xl border border-[#e8dfd0]/15 bg-[#14161c] px-4 py-3 text-sm outline-none placeholder:text-[#e8dfd0]/35 focus:border-[#e8dfd0]/35"
         />
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             onClick={handleAnalyze}
             disabled={!otherNote.trim()}
-            className="rounded-full border border-[#1a1612]/20 bg-white px-4 py-2 text-sm disabled:opacity-40"
+            className="rounded-full border border-[#e8dfd0]/20 bg-[#14161c] px-4 py-2 text-sm disabled:opacity-40"
           >
             内容を解析して反映
           </button>
           {analysis ? (
-            <p className="text-xs text-[#1f4f4b]">{describeAnalysis(analysis)}</p>
+            <p className="text-xs text-[#c9a66b]">{describeAnalysis(analysis)}</p>
           ) : (
-            <p className="text-xs text-[#1a1612]/45">
+            <p className="text-xs text-[#e8dfd0]/45">
               キーワードから気分・環境を自動で追加します
+              {enabledGroups.size === 0
+                ? "（環境の自動反映は設定で ON にした項目のみ）"
+                : ""}
             </p>
           )}
         </div>
       </section>
 
-      <section className="space-y-6">
-        <h2 className="text-sm font-medium tracking-wide text-[#1a1612]/55">
-          環境（任意・複数可）
-        </h2>
-        {ENV_GROUPS.map((group) => (
-          <div key={group.key} className="space-y-2">
-            <p className="text-xs text-[#1a1612]/45">{group.label}</p>
-            <div className="flex flex-wrap gap-2">
-              {ENVIRONMENTS.filter((item) => item.group === group.key).map(
-                (item) => {
-                  const active = environments.includes(item.id);
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => toggleEnvironment(item.id)}
-                      className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${
-                        active
-                          ? "bg-[#2a6f6a] text-white"
-                          : "border border-[#1a1612]/12 bg-white text-[#1a1612] hover:border-[#1a1612]/30"
-                      }`}
-                    >
-                      <span aria-hidden>{item.emoji}</span>
-                      {item.label}
-                    </button>
-                  );
-                },
-              )}
+      {visibleEnvGroups.length > 0 ? (
+        <section className="space-y-6">
+          <h2 className="text-sm font-medium tracking-wide text-[#e8dfd0]/55">
+            環境（任意・複数可）
+          </h2>
+          {visibleEnvGroups.map((group) => (
+            <div key={group.key} className="space-y-2">
+              <p className="text-xs text-[#e8dfd0]/45">{group.label}</p>
+              <div className="flex flex-wrap gap-2">
+                {ENVIRONMENTS.filter((item) => item.group === group.key).map(
+                  (item) => {
+                    const active = environments.includes(item.id);
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => toggleEnvironment(item.id)}
+                        className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm transition ${
+                          active
+                            ? "bg-[#c9a66b] text-white"
+                            : "border border-[#e8dfd0]/12 bg-[#14161c] text-[#e8dfd0] hover:border-[#e8dfd0]/30"
+                        }`}
+                      >
+                        <span aria-hidden>{item.emoji}</span>
+                        {item.label}
+                      </button>
+                    );
+                  },
+                )}
+              </div>
             </div>
-          </div>
-        ))}
-      </section>
+          ))}
+        </section>
+      ) : (
+        <section className="space-y-2">
+          <h2 className="text-sm font-medium tracking-wide text-[#e8dfd0]/55">
+            環境
+          </h2>
+          <p className="text-xs text-[#e8dfd0]/45">
+            季節・天気・時間帯は設定でオフのため、ホームでは使いません。
+            <Link
+              href="/settings"
+              className="ml-1 underline underline-offset-2 hover:text-[#e8dfd0]"
+            >
+              設定を開く
+            </Link>
+          </p>
+        </section>
+      )}
 
       <section className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <button
           type="button"
           onClick={handleGenerate}
           disabled={!canGenerate}
-          className="rounded-full bg-[#1a1612] px-8 py-4 text-sm font-semibold text-[#f4f0e8] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-full bg-[#c9a66b] px-8 py-4 text-sm font-semibold text-[#f4f0e8] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           プレイリスト生成
         </button>
-        <p className="text-sm text-[#1a1612]/55">{summary}</p>
+        <p className="text-sm text-[#e8dfd0]/55">{summary}</p>
       </section>
 
       <section className="grid gap-10 md:grid-cols-2">
@@ -303,9 +358,9 @@ function HistoryBlock({
     <div>
       <h2 className="font-[family-name:var(--font-display)] text-2xl">{title}</h2>
       {items.length === 0 ? (
-        <p className="mt-4 text-sm text-[#1a1612]/45">{empty}</p>
+        <p className="mt-4 text-sm text-[#e8dfd0]/45">{empty}</p>
       ) : (
-        <ul className="mt-4 divide-y divide-[#1a1612]/10 border-y border-[#1a1612]/10">
+        <ul className="mt-4 divide-y divide-[#e8dfd0]/10 border-y border-[#e8dfd0]/10">
           {items.map((item) => (
             <li key={item.id} className="flex items-start gap-3 py-4">
               <span className="text-xl" aria-hidden>
@@ -315,7 +370,7 @@ function HistoryBlock({
                 <p className="truncate text-sm font-medium">
                   {item.title ?? moodLabel(item.mood)}
                 </p>
-                <p className="mt-1 text-xs text-[#1a1612]/45">
+                <p className="mt-1 text-xs text-[#e8dfd0]/45">
                   {formatRelativeTime(item.createdAt)}
                   {item.trackCount > 0 ? ` · ${item.trackCount}曲` : ""}
                   {environmentLabels(item.environments)

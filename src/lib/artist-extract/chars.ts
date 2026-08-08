@@ -6,9 +6,9 @@
 export const NORMAL_CHAR =
   /[a-zA-Z0-9\u3040-\u30ff\u4e00-\u9fff\uff66-\uff9d]/g;
 
-/** 装飾的 unicode（絵文字・記号・結合文字など） */
+/** 装飾的 unicode（絵文字・記号・結合文字など）。`.test()` 用のため g は付けない */
 export const DECORATIVE =
-  /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{2300}-\u{23FF}\u{2B50}\u{2B55}★☆♪♫♥♡◆◇■□●○※✨☀☁☂☃❄☄⚡☀︎]/gu;
+  /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}\u{20E3}\u{2300}-\u{23FF}\u{2B50}\u{2B55}★☆♪♫♥♡◆◇■□●○※✨☀☁☂☃❄☄⚡☀︎]/u;
 
 /** 装飾除去用（【】などは clean 側で別処理するため絵文字・装飾記号中心） */
 export const DECORATIVE_STRIP =

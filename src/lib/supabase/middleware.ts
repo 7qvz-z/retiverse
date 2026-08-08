@@ -46,11 +46,14 @@ export async function updateSession(request: NextRequest) {
   });
 
   const pathname = request.nextUrl.pathname;
+  const isLegalPublic =
+    pathname === "/privacy" || pathname === "/terms";
   const isPublic =
     pathname === "/login" ||
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/_next") ||
-    pathname === "/favicon.ico";
+    pathname === "/favicon.ico" ||
+    isLegalPublic;
 
   // Auth サーバ応答待ちでページ全体が固まるのを防ぐ
   const userResult = await withTimeout(supabase.auth.getUser(), 4000);
@@ -64,31 +67,81 @@ export async function updateSession(request: NextRequest) {
 
   if (user) {
     let onboardingCompleted = true;
+    let termsAccepted = true;
+    let profileLoaded = false;
 
     const profileResult = await withTimeout(
       supabase
         .from("profiles")
-        .select("onboarding_completed")
+        .select("onboarding_completed, terms_accepted_at")
         .eq("id", user.id)
         .maybeSingle(),
       3000,
     );
 
     if (profileResult && !profileResult.error) {
+      profileLoaded = true;
       onboardingCompleted =
         profileResult.data?.onboarding_completed ?? false;
+      termsAccepted = Boolean(profileResult.data?.terms_accepted_at);
+    } else if (
+      profileResult?.error &&
+      /terms_accepted_at/i.test(profileResult.error.message)
+    ) {
+      // マイグレーション未適用時は同意チェックをスキップ（アプリをロックしない）
+      const fallback = await withTimeout(
+        supabase
+          .from("profiles")
+          .select("onboarding_completed")
+          .eq("id", user.id)
+          .maybeSingle(),
+        3000,
+      );
+      if (fallback && !fallback.error) {
+        profileLoaded = true;
+        onboardingCompleted = fallback.data?.onboarding_completed ?? false;
+      }
     }
+
+    const isConsent = pathname === "/consent";
+    const isSetup = pathname === "/setup";
+    const skipGate =
+      isLegalPublic ||
+      isConsent ||
+      pathname.startsWith("/auth/");
 
     if (pathname === "/login") {
       const redirectUrl = request.nextUrl.clone();
-      redirectUrl.pathname = onboardingCompleted ? "/" : "/setup";
+      if (profileLoaded && !termsAccepted) {
+        redirectUrl.pathname = "/consent";
+      } else {
+        redirectUrl.pathname = onboardingCompleted ? "/" : "/setup";
+      }
       return NextResponse.redirect(redirectUrl);
     }
 
-    const isSetup = pathname === "/setup";
-    if (!onboardingCompleted && !isSetup && !pathname.startsWith("/auth/")) {
+    if (profileLoaded && !termsAccepted && !skipGate) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = "/consent";
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    if (
+      profileLoaded &&
+      termsAccepted &&
+      !onboardingCompleted &&
+      !isSetup &&
+      !skipGate
+    ) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = "/setup";
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    // 同意済みで /consent に来たら先へ送る
+    if (profileLoaded && termsAccepted && isConsent) {
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = onboardingCompleted ? "/" : "/setup";
       return NextResponse.redirect(redirectUrl);
     }
   }

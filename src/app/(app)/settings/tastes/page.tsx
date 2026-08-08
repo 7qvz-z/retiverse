@@ -23,12 +23,12 @@ export default async function TastesSettingsPage() {
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
-      <p className="text-sm text-[#1a1612]/50">設定</p>
+      <p className="text-sm text-[#e8dfd0]/50">設定</p>
       <h1 className="mt-2 font-[family-name:var(--font-display)] text-4xl">
-        アーティスト・ジャンル
+        あなたの音楽スタイル
       </h1>
-      <p className="mt-3 text-[#1a1612]/65">
-        いつでも追加・削除できます。保存すると次の生成から反映されます。
+      <p className="mt-3 text-[#e8dfd0]/65">
+        好きなアーティストとジャンルをいつでも追加・削除できます。変更はすぐ次の生成に反映されます。
       </p>
 
       <div className="mt-10">

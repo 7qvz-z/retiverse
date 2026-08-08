@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
@@ -11,6 +10,7 @@ import {
   type GenerationSummary,
 } from "@/lib/home";
 import { createClient } from "@/lib/supabase/client";
+import type { YouTubeUsageSummary } from "@/lib/youtube/quota";
 
 export type TrackEventSummary = {
   id: string;
@@ -32,9 +32,24 @@ type Props = {
   createdPlaylists: GenerationSummary[];
   playEvents: TrackEventSummary[];
   skipEvents: TrackEventSummary[];
+  youtubeUsage: YouTubeUsageSummary;
 };
 
 type Tab = "generations" | "favorites" | "playlists" | "plays" | "skips";
+
+function formatResetLabel(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString("ja-JP", {
+      timeZone: "Asia/Tokyo",
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
 
 export function MePanel({
   displayName,
@@ -49,7 +64,9 @@ export function MePanel({
   createdPlaylists: _createdPlaylists,
   playEvents,
   skipEvents,
+  youtubeUsage,
 }: Props) {
+  void _createdPlaylists;
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("generations");
   const [generations, setGenerations] = useState(initialGenerations);
@@ -122,7 +139,7 @@ export function MePanel({
               className="h-16 w-16 rounded-full object-cover"
             />
           ) : (
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#1a1612] text-xl text-[#f4f0e8]">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#c9a66b] text-xl text-[#0a0b0d]">
               {(displayName ?? "U").slice(0, 1)}
             </div>
           )}
@@ -130,11 +147,11 @@ export function MePanel({
             <h1 className="font-[family-name:var(--font-display)] text-3xl sm:text-4xl">
               {displayName ?? "ユーザー"}
             </h1>
-            <p className="mt-1 text-sm text-[#1a1612]/55">
+            <p className="mt-1 text-sm text-[#e8dfd0]/55">
               {email ?? "メール未取得"}
             </p>
-            <div className="mt-2 flex flex-wrap gap-2 text-xs text-[#1a1612]/55">
-              <span className="rounded-full bg-[#1a1612] px-2.5 py-1 text-[#f4f0e8]">
+            <div className="mt-2 flex flex-wrap gap-2 text-xs text-[#e8dfd0]/55">
+              <span className="rounded-full bg-[#c9a66b] px-2.5 py-1 text-[#f4f0e8]">
                 {plan === "premium" ? "Premium" : "無料プラン"}
               </span>
               <span>アーティスト {artistCount}</span>
@@ -149,30 +166,20 @@ export function MePanel({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Link
-            href="/settings"
-            className="rounded-full border border-[#1a1612]/15 bg-white px-4 py-2 text-sm"
-          >
-            設定
-          </Link>
-          <Link
-            href="/settings/tastes"
-            className="rounded-full border border-[#1a1612]/15 bg-white px-4 py-2 text-sm"
-          >
-            好み
-          </Link>
           <button
             type="button"
             onClick={() => void handleSignOut()}
             disabled={signingOut}
-            className="rounded-full border border-[#1a1612]/15 px-4 py-2 text-sm disabled:opacity-50"
+            className="rounded-full border border-[#e8dfd0]/15 px-4 py-2 text-sm disabled:opacity-50"
           >
             {signingOut ? "ログアウト中…" : "ログアウト"}
           </button>
         </div>
       </section>
 
-      <div className="flex flex-wrap gap-2 border-b border-[#1a1612]/10 pb-3">
+      <YouTubeUsageCard usage={youtubeUsage} />
+
+      <div className="flex flex-wrap gap-2 border-b border-[#e8dfd0]/10 pb-3">
         {tabs.map((item) => (
           <button
             key={item.id}
@@ -180,8 +187,8 @@ export function MePanel({
             onClick={() => setTab(item.id)}
             className={`rounded-full px-3 py-1.5 text-sm transition ${
               tab === item.id
-                ? "bg-[#1a1612] text-[#f4f0e8]"
-                : "text-[#1a1612]/60 hover:bg-white"
+                ? "bg-[#c9a66b] text-[#0a0b0d]"
+                : "text-[#e8dfd0]/60 hover:bg-[#1a1d24]"
             }`}
           >
             {item.label}
@@ -240,6 +247,111 @@ export function MePanel({
   );
 }
 
+function YouTubeUsageCard({ usage }: { usage: YouTubeUsageSummary }) {
+  if (usage.migrationMissing) {
+    return (
+      <section className="rounded-2xl border border-[#c9a66b]/25 bg-[#14161c] px-4 py-4">
+        <h2 className="text-sm font-medium text-[#c9a66b]">
+          YouTube API 利用量
+        </h2>
+        <p className="mt-2 text-sm text-[#e8dfd0]/65">
+          利用量テーブルが未作成です。Supabase SQL Editor で
+          <code className="mx-1 text-xs text-[#c9a66b]">
+            20260807000000_youtube_api_usage.sql
+          </code>
+          を実行すると表示されます。
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-2xl border border-[#e8dfd0]/10 bg-[#14161c]/90 px-4 py-5 sm:px-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-medium tracking-wide text-[#c9a66b]">
+            YouTube API 利用量（本日）
+          </h2>
+          <p className="mt-1 text-xs text-[#e8dfd0]/45">
+            アプリが記録した推定クォータです。Google
+            公式メーターではありません。リセット目安（日本時間）:{" "}
+            {formatResetLabel(usage.quotaResetsAtIso)}
+          </p>
+        </div>
+        <p className="font-[family-name:var(--font-display)] text-3xl text-[#e8dfd0]">
+          {usage.projectUnitsToday.toLocaleString("ja-JP")}
+          <span className="ml-1 text-base text-[#e8dfd0]/45">
+            / {usage.dailyLimit.toLocaleString("ja-JP")}
+          </span>
+        </p>
+      </div>
+
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#e8dfd0]/10">
+        <div
+          className={`h-full rounded-full transition-all ${
+            usage.usedPercent >= 90
+              ? "bg-[#b42318]"
+              : usage.usedPercent >= 70
+                ? "bg-[#c9a66b]"
+                : "bg-[#c9a66b]/80"
+          }`}
+          style={{ width: `${usage.usedPercent}%` }}
+        />
+      </div>
+
+      <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+        <div>
+          <dt className="text-xs text-[#e8dfd0]/45">残り（推定）</dt>
+          <dd className="mt-1 font-medium">
+            {usage.remainingUnits.toLocaleString("ja-JP")} 単位
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-[#e8dfd0]/45">あなたの消費</dt>
+          <dd className="mt-1 font-medium">
+            {usage.userUnitsToday.toLocaleString("ja-JP")} 単位
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-[#e8dfd0]/45">検索 API 呼び出し</dt>
+          <dd className="mt-1 font-medium">
+            {usage.searchApiCallsToday} 回
+            <span className="ml-1 text-xs text-[#e8dfd0]/45">
+              （各 100 単位）
+            </span>
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-[#e8dfd0]/45">キャッシュで節約</dt>
+          <dd className="mt-1 font-medium">
+            {usage.unitsSavedByCacheToday.toLocaleString("ja-JP")} 単位
+            <span className="ml-1 text-xs text-[#e8dfd0]/45">
+              （{usage.searchCacheHitsToday} ヒット）
+            </span>
+          </dd>
+        </div>
+      </dl>
+
+      {usage.byOperation.length > 0 ? (
+        <ul className="mt-4 space-y-1 border-t border-[#e8dfd0]/10 pt-3 text-xs text-[#e8dfd0]/55">
+          {usage.byOperation.slice(0, 6).map((row) => (
+            <li key={row.operation} className="flex justify-between gap-3">
+              <span>{row.operation}</span>
+              <span>
+                {row.count}回 · {row.units.toLocaleString("ja-JP")}単位
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-4 text-xs text-[#e8dfd0]/45">
+          まだ本日の API 消費記録はありません。プレイリスト生成後にここに表示されます。
+        </p>
+      )}
+    </section>
+  );
+}
+
 function GenerationList({
   items,
   empty,
@@ -252,11 +364,11 @@ function GenerationList({
   onToggleFavorite: (item: GenerationSummary) => void;
 }) {
   if (items.length === 0) {
-    return <p className="text-sm text-[#1a1612]/45">{empty}</p>;
+    return <p className="text-sm text-[#e8dfd0]/45">{empty}</p>;
   }
 
   return (
-    <ul className="divide-y divide-[#1a1612]/10 border-y border-[#1a1612]/10">
+    <ul className="divide-y divide-[#e8dfd0]/10 border-y border-[#e8dfd0]/10">
       {items.map((item) => (
         <li
           key={item.id}
@@ -270,7 +382,7 @@ function GenerationList({
               <p className="truncate text-sm font-medium">
                 {item.title ?? moodLabel(item.mood)}
               </p>
-              <p className="mt-1 text-xs text-[#1a1612]/45">
+              <p className="mt-1 text-xs text-[#e8dfd0]/45">
                 {formatRelativeTime(item.createdAt)}
                 {item.trackCount > 0 ? ` · ${item.trackCount}曲` : ""}
                 {environmentLabels(item.environments)
@@ -285,7 +397,7 @@ function GenerationList({
               type="button"
               onClick={() => onToggleFavorite(item)}
               disabled={busyId === item.id}
-              className="rounded-full border border-[#1a1612]/15 px-3 py-1.5 text-xs disabled:opacity-50"
+              className="rounded-full border border-[#e8dfd0]/15 px-3 py-1.5 text-xs disabled:opacity-50"
             >
               {item.isFavorite ? "★ お気に入り解除" : "☆ お気に入り"}
             </button>
@@ -294,7 +406,7 @@ function GenerationList({
                 href={`https://www.youtube.com/playlist?list=${item.youtubePlaylistId}`}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-full bg-[#1a1612] px-3 py-1.5 text-xs text-[#f4f0e8]"
+                className="rounded-full bg-[#c9a66b] px-3 py-1.5 text-xs text-[#0a0b0d]"
               >
                 YouTubeで開く
               </a>
@@ -314,11 +426,11 @@ function EventList({
   empty: string;
 }) {
   if (items.length === 0) {
-    return <p className="text-sm text-[#1a1612]/45">{empty}</p>;
+    return <p className="text-sm text-[#e8dfd0]/45">{empty}</p>;
   }
 
   return (
-    <ul className="divide-y divide-[#1a1612]/10 border-y border-[#1a1612]/10">
+    <ul className="divide-y divide-[#e8dfd0]/10 border-y border-[#e8dfd0]/10">
       {items.map((item) => (
         <li
           key={item.id}
@@ -332,7 +444,7 @@ function EventList({
           >
             {item.youtubeVideoId}
           </a>
-          <span className="shrink-0 text-xs text-[#1a1612]/45">
+          <span className="shrink-0 text-xs text-[#e8dfd0]/45">
             {formatRelativeTime(item.createdAt)}
           </span>
         </li>

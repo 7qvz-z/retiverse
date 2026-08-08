@@ -9,8 +9,9 @@ export type ClaudeFallbackInput = {
 };
 
 export async function extractArtistsWithClaude(
-  _input: ClaudeFallbackInput,
+  input: ClaudeFallbackInput,
 ): Promise<string[] | null> {
+  void input;
   // TODO: Anthropic API でタイトル・チャンネルからアーティスト判定
   return null;
 }

@@ -118,19 +118,51 @@ export function preferMvThenTopic(
   shuffleFn: <T>(items: T[], enabled: boolean) => T[],
   randomnessEnabled: boolean,
 ): TrackCandidate[] {
-  const mvs = shuffleFn(
-    tracks.filter((t) => getMusicSourceKind(t) === "mv"),
+  return pickBySourceOrder(
+    tracks,
+    targetCount,
+    shuffleFn,
     randomnessEnabled,
+    ["mv", "topic"],
   );
-  const topics = shuffleFn(
-    tracks.filter((t) => getMusicSourceKind(t) === "topic"),
+}
+
+/**
+ * Topic を優先し、足りない分を MV で埋める
+ */
+export function preferTopicThenMv(
+  tracks: TrackCandidate[],
+  targetCount: number,
+  shuffleFn: <T>(items: T[], enabled: boolean) => T[],
+  randomnessEnabled: boolean,
+): TrackCandidate[] {
+  return pickBySourceOrder(
+    tracks,
+    targetCount,
+    shuffleFn,
     randomnessEnabled,
+    ["topic", "mv"],
+  );
+}
+
+function pickBySourceOrder(
+  tracks: TrackCandidate[],
+  targetCount: number,
+  shuffleFn: <T>(items: T[], enabled: boolean) => T[],
+  randomnessEnabled: boolean,
+  order: MusicSourceKind[],
+): TrackCandidate[] {
+  const buckets = order.map((kind) =>
+    shuffleFn(
+      tracks.filter((t) => getMusicSourceKind(t) === kind),
+      randomnessEnabled,
+    ),
   );
 
   const merged: TrackCandidate[] = [];
   const seen = new Set<string>();
 
-  for (const track of [...mvs, ...topics]) {
+  for (const track of buckets.flat()) {
     if (seen.has(track.videoId)) continue;
     seen.add(track.videoId);
     merged.push(track);

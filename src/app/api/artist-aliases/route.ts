@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { appendAliasMerge } from "@/lib/artist-extract/alias-io";
 import { createClient } from "@/lib/supabase/server";
+import { isMissingRelationError } from "@/lib/supabase/migration-hints";
 
 type Body = {
   canonical?: string;
@@ -34,21 +34,20 @@ export async function POST(request: Request) {
     );
   }
 
-  // ユーザー単位で DB に永続化（本番FSは読み取り専用のためこちらが正）
-  const { error: insertError } = await supabase.from("artist_corrections").insert({
-    user_id: session.user.id,
-    kind: "alias",
-    raw_name: mergeFrom,
-    canonical_name: canonical,
-    split_into: [],
-  });
+  const { data, error: insertError } = await supabase
+    .from("artist_corrections")
+    .insert({
+      user_id: session.user.id,
+      kind: "alias",
+      raw_name: mergeFrom,
+      canonical_name: canonical,
+      split_into: [],
+    })
+    .select("*")
+    .single();
 
   if (insertError) {
-    if (
-      insertError.message.includes("artist_corrections") ||
-      insertError.code === "PGRST205" ||
-      insertError.code === "42P01"
-    ) {
+    if (isMissingRelationError(insertError, "artist_corrections")) {
       return NextResponse.json(
         {
           error:
@@ -60,19 +59,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
-  // ローカル開発向け: 共有辞書ファイルへの追記はベストエフォート
-  let aliases: string[] = [mergeFrom];
-  try {
-    const dictionary = await appendAliasMerge({ canonical, mergeFrom });
-    aliases = dictionary[canonical] ?? aliases;
-  } catch {
-    // ignore fs errors (Vercel 等)
-  }
-
   return NextResponse.json({
     ok: true,
     canonical,
     mergeFrom,
-    aliases,
+    aliases: [mergeFrom],
+    correction: data,
   });
 }

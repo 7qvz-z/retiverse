@@ -2,6 +2,7 @@ import { MePanel } from "@/components/me/MePanel";
 import type { GenerationSummary } from "@/lib/home";
 import { mapProfile, type ProfileRow } from "@/lib/profile";
 import { createClient } from "@/lib/supabase/server";
+import { getYouTubeUsageSummary } from "@/lib/youtube/quota";
 import { redirect } from "next/navigation";
 
 type GenerationRow = {
@@ -92,6 +93,8 @@ export default async function MePage() {
       createdAt: e.created_at,
     }));
 
+  const youtubeUsage = await getYouTubeUsageSummary(user.id);
+
   return (
     <main className="mx-auto max-w-5xl px-6 py-10 sm:py-14">
       <MePanel
@@ -115,6 +118,7 @@ export default async function MePage() {
         createdPlaylists={createdPlaylists}
         playEvents={playEvents}
         skipEvents={skipEvents}
+        youtubeUsage={youtubeUsage}
       />
     </main>
   );

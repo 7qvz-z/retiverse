@@ -56,8 +56,20 @@ export const SETUP_TOGGLE_FIELDS = [
 ] as const;
 
 export const YOUTUBE_SCOPES = [
-  "openid",
-  "email",
-  "profile",
   "https://www.googleapis.com/auth/youtube.force-ssl",
 ].join(" ");
+
+export const INSUFFICIENT_YOUTUBE_SCOPES_MESSAGE =
+  "YouTube への権限が不足しています。「YouTube連携する」を押して、許可画面で YouTube へのアクセスを許可してください。";
+
+export function mapYouTubeApiErrorMessage(message: string): string {
+  const lower = message.toLowerCase();
+  if (
+    lower.includes("insufficient") ||
+    lower.includes("scope") ||
+    lower.includes("insufficientpermissions")
+  ) {
+    return INSUFFICIENT_YOUTUBE_SCOPES_MESSAGE;
+  }
+  return message;
+}

@@ -1,7 +1,15 @@
 import type { EnvironmentTag, Mood } from "@/lib/types";
 
-export const APP_NAME = "リテイバース";
-export const APP_CATCHCOPY = "いまのあなただけにあったプレイリストを自動生成";
+export const APP_NAME = "Retiverse";
+export const APP_NAME_JA = "リテイバース";
+export const APP_CATCHCOPY =
+  "いまの気分に、ぴったりの宇宙をつくる。";
+export const APP_TAGLINE = "YouTube playlist for this moment";
+
+/** 法務ページ用（後で実値に差し替え） */
+export const LEGAL_OPERATOR = "Retiverse 運営";
+export const LEGAL_CONTACT_EMAIL = "support.project.001@gmail.com";
+export const LEGAL_LAST_UPDATED = "2026年8月8日";
 
 export const MOODS: { id: Mood; label: string; emoji: string }[] = [
   { id: "energetic", label: "元気", emoji: "😊" },

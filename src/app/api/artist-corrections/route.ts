@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { ArtistCorrectionKind } from "@/lib/artist-extract/corrections";
+import { isMissingRelationError } from "@/lib/supabase/migration-hints";
 
 type Body = {
   kind?: ArtistCorrectionKind;
@@ -10,6 +11,9 @@ type Body = {
   sourceTitle?: string | null;
   sourceChannel?: string | null;
 };
+
+const MISSING_TABLE_ERROR =
+  "artist_corrections テーブルがありません。supabase/migrations/20260805000000_artist_corrections.sql を SQL Editor で実行してください。";
 
 export async function GET() {
   const supabase = await createClient();
@@ -29,6 +33,9 @@ export async function GET() {
     .limit(500);
 
   if (error) {
+    if (isMissingRelationError(error, "artist_corrections")) {
+      return NextResponse.json({ error: MISSING_TABLE_ERROR }, { status: 500 });
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -101,22 +108,50 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
-    // テーブル未作成時のヒント
-    if (
-      error.message.includes("artist_corrections") ||
-      error.code === "PGRST205" ||
-      error.code === "42P01"
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "artist_corrections テーブルがありません。supabase/migrations/20260805000000_artist_corrections.sql を SQL Editor で実行してください。",
-        },
-        { status: 500 },
-      );
+    if (isMissingRelationError(error, "artist_corrections")) {
+      return NextResponse.json({ error: MISSING_TABLE_ERROR }, { status: 500 });
     }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
   return NextResponse.json({ correction: data });
+}
+
+export async function DELETE(request: Request) {
+  const supabase = await createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session?.user) {
+    return NextResponse.json({ error: "ログインが必要です" }, { status: 401 });
+  }
+
+  let id = "";
+  const contentType = request.headers.get("content-type") ?? "";
+  if (contentType.includes("application/json")) {
+    const body = (await request.json()) as { id?: string };
+    id = body.id?.trim() ?? "";
+  }
+  if (!id) {
+    id = new URL(request.url).searchParams.get("id")?.trim() ?? "";
+  }
+  if (!id) {
+    return NextResponse.json({ error: "id が必要です" }, { status: 400 });
+  }
+
+  const { error } = await supabase
+    .from("artist_corrections")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", session.user.id);
+
+  if (error) {
+    if (isMissingRelationError(error, "artist_corrections")) {
+      return NextResponse.json({ error: MISSING_TABLE_ERROR }, { status: 500 });
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true, id });
 }

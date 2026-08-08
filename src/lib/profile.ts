@@ -11,6 +11,7 @@ export type ProfileRow = {
   avatar_url: string | null;
   youtube_channel_id: string | null;
   onboarding_completed: boolean;
+  terms_accepted_at?: string | null;
   favorite_artists: string[] | null;
   favorite_genres: string[] | null;
   preferences: UserPreferences | null;
@@ -28,6 +29,7 @@ export function mapProfile(row: ProfileRow): Profile {
     avatarUrl: row.avatar_url,
     youtubeChannelId: row.youtube_channel_id,
     onboardingCompleted: row.onboarding_completed,
+    termsAcceptedAt: row.terms_accepted_at ?? null,
     favoriteArtists: row.favorite_artists ?? [],
     favoriteGenres: row.favorite_genres ?? [],
     preferences: { ...DEFAULT_PREFERENCES, ...(row.preferences ?? {}) },

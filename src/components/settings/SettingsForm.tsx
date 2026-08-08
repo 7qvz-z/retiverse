@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { YouTubeConnectButton } from "@/components/setup/YouTubeConnectButton";
 import {
   ARTIST_MAX_TRACKS,
@@ -119,10 +119,10 @@ export function SettingsForm({ profile }: Props) {
           プラン
         </h2>
         <div className="flex flex-wrap items-center gap-3 text-sm">
-          <span className="rounded-full bg-[#1a1612] px-3 py-1 text-[#f4f0e8]">
+          <span className="rounded-full bg-[#c9a66b] px-3 py-1 text-[#f4f0e8]">
             {planLabel}
           </span>
-          <span className="text-[#1a1612]/55">
+          <span className="text-[#e8dfd0]/55">
             曲数 10〜300・重複回避つき。Premium 機能は今後追加予定です。
           </span>
         </div>
@@ -132,7 +132,7 @@ export function SettingsForm({ profile }: Props) {
         <h2 className="font-[family-name:var(--font-display)] text-2xl">
           YouTube連携
         </h2>
-        <p className="text-sm text-[#1a1612]/55">
+        <p className="text-sm text-[#e8dfd0]/55">
           プレイリスト解析・YouTubeへの追加に必要です。トークンが切れたらここでやり直せます。
         </p>
         <YouTubeConnectButton
@@ -144,22 +144,22 @@ export function SettingsForm({ profile }: Props) {
 
       <section className="space-y-3">
         <h2 className="font-[family-name:var(--font-display)] text-2xl">
-          好み
+          あなたの音楽スタイル
         </h2>
-        <p className="text-sm text-[#1a1612]/55">
+        <p className="text-sm text-[#e8dfd0]/55">
           アーティスト {profile.favoriteArtists.length} / ジャンル{" "}
           {profile.favoriteGenres.length}
         </p>
         <div className="flex flex-wrap gap-3 text-sm">
           <Link
             href="/settings/tastes"
-            className="text-[#2a6f6a] underline-offset-2 hover:underline"
+            className="text-[#c9a66b] underline-offset-2 hover:underline"
           >
             アーティスト・ジャンルを編集
           </Link>
           <Link
             href="/settings/playlists"
-            className="text-[#2a6f6a] underline-offset-2 hover:underline"
+            className="text-[#c9a66b] underline-offset-2 hover:underline"
           >
             YouTubeプレイリストを解析
           </Link>
@@ -170,7 +170,7 @@ export function SettingsForm({ profile }: Props) {
         <h2 className="font-[family-name:var(--font-display)] text-2xl">
           生成オプション
         </h2>
-        <ul className="divide-y divide-[#1a1612]/10 border-y border-[#1a1612]/10">
+        <ul className="divide-y divide-[#e8dfd0]/10 border-y border-[#e8dfd0]/10">
           {SETUP_TOGGLE_FIELDS.map((field) => (
             <li
               key={field.key}
@@ -178,7 +178,7 @@ export function SettingsForm({ profile }: Props) {
             >
               <div>
                 <p className="text-sm font-medium">{field.label}</p>
-                <p className="mt-0.5 text-xs text-[#1a1612]/50">
+                <p className="mt-0.5 text-xs text-[#e8dfd0]/50">
                   {field.description}
                 </p>
               </div>
@@ -188,11 +188,11 @@ export function SettingsForm({ profile }: Props) {
                 aria-checked={preferences[field.key]}
                 onClick={() => toggle(field.key)}
                 className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-                  preferences[field.key] ? "bg-[#2a6f6a]" : "bg-[#1a1612]/20"
+                  preferences[field.key] ? "bg-[#c9a66b]" : "bg-[#e8dfd0]/20"
                 }`}
               >
                 <span
-                  className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white transition ${
+                  className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-[#14161c] transition ${
                     preferences[field.key] ? "translate-x-5" : ""
                   }`}
                 />
@@ -261,20 +261,20 @@ export function SettingsForm({ profile }: Props) {
           {error}
         </p>
       ) : null}
-      {message ? <p className="text-sm text-[#1f4f4b]">{message}</p> : null}
+      {message ? <p className="text-sm text-[#c9a66b]">{message}</p> : null}
 
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="button"
           onClick={() => void handleSave()}
           disabled={saving || !dirty}
-          className="rounded-full bg-[#1a1612] px-6 py-3 text-sm font-semibold text-[#f4f0e8] disabled:opacity-40"
+          className="rounded-full bg-[#c9a66b] px-6 py-3 text-sm font-semibold text-[#0a0b0d] disabled:opacity-40"
         >
           {saving ? "保存中…" : "設定を保存"}
         </button>
         <Link
           href="/"
-          className="text-sm text-[#2a6f6a] underline-offset-2 hover:underline"
+          className="text-sm text-[#c9a66b] underline-offset-2 hover:underline"
         >
           ホームに戻る
         </Link>
@@ -309,10 +309,11 @@ function NumberField({
   onChange,
 }: NumberFieldProps) {
   const [draft, setDraft] = useState(String(value));
-
-  useEffect(() => {
+  const [prevValue, setPrevValue] = useState(value);
+  if (value !== prevValue) {
+    setPrevValue(value);
     setDraft(String(value));
-  }, [value]);
+  }
 
   function commit(raw: string) {
     const parsed = Number(raw);
@@ -346,10 +347,10 @@ function NumberField({
                 e.currentTarget.blur();
               }
             }}
-            className="w-20 rounded-lg border border-[#1a1612]/15 bg-white px-2 py-1.5 text-right text-sm outline-none focus:border-[#1a1612]/40 disabled:cursor-not-allowed"
+            className="w-20 rounded-lg border border-[#e8dfd0]/15 bg-[#14161c] px-2 py-1.5 text-right text-sm outline-none focus:border-[#e8dfd0]/40 disabled:cursor-not-allowed"
             aria-label={`${label}の数値入力`}
           />
-          <span className="text-sm text-[#1a1612]/55">{unit}</span>
+          <span className="text-sm text-[#e8dfd0]/55">{unit}</span>
         </div>
       </div>
       <input
@@ -364,10 +365,10 @@ function NumberField({
           const normalized = normalize ? normalize(next) : next;
           onChange(normalized);
         }}
-        className="w-full accent-[#2a6f6a] disabled:cursor-not-allowed"
+        className="w-full accent-[#c9a66b] disabled:cursor-not-allowed"
         aria-label={`${label}のスライダー`}
       />
-      <div className="flex justify-between text-xs text-[#1a1612]/40">
+      <div className="flex justify-between text-xs text-[#e8dfd0]/40">
         <span>
           {min}
           {unit}
@@ -377,7 +378,7 @@ function NumberField({
           {unit}
         </span>
       </div>
-      {hint ? <p className="text-xs text-[#1a1612]/45">{hint}</p> : null}
+      {hint ? <p className="text-xs text-[#e8dfd0]/45">{hint}</p> : null}
     </div>
   );
 }

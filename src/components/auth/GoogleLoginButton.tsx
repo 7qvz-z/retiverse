@@ -23,11 +23,12 @@ export function GoogleLoginButton({ className }: Props) {
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${siteUrl}/auth/callback`,
+          redirectTo: `${siteUrl}/auth/callback?next=${encodeURIComponent("/setup")}`,
+          // ログインは identity のみ。YouTube API は専用連携フローで取得する
           scopes: "openid email profile",
           queryParams: {
             access_type: "offline",
-            prompt: "consent",
+            prompt: "select_account",
           },
         },
       });
@@ -52,7 +53,7 @@ export function GoogleLoginButton({ className }: Props) {
         type="button"
         onClick={handleLogin}
         disabled={loading}
-        className="group inline-flex w-full max-w-sm items-center justify-center gap-3 rounded-full bg-[#f4f0e8] px-8 py-4 text-base font-semibold text-[#1a1612] transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f4f0e8] disabled:cursor-not-allowed disabled:opacity-70"
+        className="group inline-flex w-full max-w-sm items-center justify-center gap-3 rounded-full border border-[#d4a574]/35 bg-[#f4f0e8] px-8 py-4 text-base font-semibold text-[#0a0b0d] transition hover:border-[#d4a574]/70 hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#d4a574] disabled:cursor-not-allowed disabled:opacity-70"
       >
         <GoogleIcon />
         <span>{loading ? "接続中…" : "Googleでログイン"}</span>

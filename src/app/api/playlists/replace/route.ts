@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { isEnvironment, isMood } from "@/lib/home";
+import { filterEnvironmentsByPreferences, isEnvironment, isMood } from "@/lib/home";
 import { mapProfile, type ProfileRow } from "@/lib/profile";
 import { findReplacementTrack } from "@/lib/playlist/generate";
 import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_PREFERENCES } from "@/lib/types";
+import { getYouTubeAccessToken } from "@/lib/youtube/auth";
 
 type Body = {
   seedQuery?: string;
@@ -35,19 +36,32 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   const profile = profileRow ? mapProfile(profileRow as ProfileRow) : null;
+  const preferences = profile?.preferences ?? DEFAULT_PREFERENCES;
+  const allowedEnvironments = filterEnvironmentsByPreferences(
+    environments,
+    preferences,
+  );
 
   try {
+    let accessToken: string | null = null;
+    try {
+      accessToken = await getYouTubeAccessToken(supabase, session);
+    } catch {
+      accessToken = null;
+    }
+
     const track = await findReplacementTrack({
       artists: profile?.favoriteArtists ?? [],
       genres: profile?.favoriteGenres ?? [],
       moods,
-      environments,
+      environments: allowedEnvironments,
       noteKeywords: [],
-      preferences: profile?.preferences ?? DEFAULT_PREFERENCES,
+      preferences,
       excludeVideoIds,
-      accessToken: session.provider_token ?? null,
+      accessToken,
       apiKey: process.env.YOUTUBE_API_KEY ?? null,
       seedQuery,
+      userId: session.user.id,
     });
 
     if (!track) {

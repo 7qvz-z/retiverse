@@ -1,10 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0c1214;
-  --foreground: #f4f0e8;
-  --accent: #d4a574;
-  --surface: #152428;
+  --background: #0a0b0d;
+  --foreground: #e8dfd0;
+  --accent: #c9a66b;
+  --surface: #14161c;
+  --muted: rgba(232, 223, 208, 0.55);
+  --border: rgba(201, 166, 107, 0.22);
 }
 
 @theme inline {
@@ -45,4 +47,17 @@ body {
 
 .animate-fade-up-delayed {
   animation: fade-up 0.8s ease-out 0.2s both;
+}
+
+@keyframes float-soft {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-float-soft {
+  animation: float-soft 5s ease-in-out infinite alternate;
 }

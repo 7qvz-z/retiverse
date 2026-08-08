@@ -46,18 +46,14 @@ function splitMiddleDotCautiously(text: string): string[] | null {
 export function hasBalancedParens(text: string): boolean {
   let round = 0;
   let square = 0;
-  let curly = 0;
   for (const ch of text) {
     if (ch === "(" || ch === "（") round += 1;
     if (ch === ")" || ch === "）") round -= 1;
     if (ch === "[") square += 1;
     if (ch === "]") square -= 1;
-    if (ch === "{" || ch === "「" || ch === "『") {
-      /* ignore jp quotes here */
-    }
-    if (round < 0 || square < 0 || curly < 0) return false;
+    if (round < 0 || square < 0) return false;
   }
-  return round === 0 && square === 0 && curly === 0;
+  return round === 0 && square === 0;
 }
 
 /** 揃った括弧の中身ごと除去。不揃いなら null */

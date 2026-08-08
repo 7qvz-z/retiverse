@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
 import {
-  applyArtistCorrections,
-  type ArtistCorrection,
-} from "@/lib/artist-extract/corrections";
+  buildOverrides,
+  correctionFromDbRow,
+  EMPTY_OVERRIDES,
+} from "@/lib/artist-extract/overrides";
 import { createClient } from "@/lib/supabase/server";
+import { mapYouTubeApiErrorMessage } from "@/lib/setup-options";
+import { isMissingRelationError } from "@/lib/supabase/migration-hints";
+import {
+  getYouTubeAccessToken,
+  YOUTUBE_TOKEN_MISSING_MESSAGE,
+} from "@/lib/youtube/auth";
 import {
   buildPlaylistAnalysis,
-  listMinePlaylists,
+  getPlaylistsByIds,
   listPlaylistVideoSnippets,
 } from "@/lib/youtube/playlists";
 
@@ -24,13 +31,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "ログインが必要です" }, { status: 401 });
   }
 
-  const accessToken = session.provider_token;
-  if (!accessToken) {
+  let accessToken: string | null;
+  try {
+    accessToken = await getYouTubeAccessToken(supabase, session);
+  } catch (e) {
     return NextResponse.json(
       {
         error:
-          "YouTube 連携トークンがありません。YouTube 連携をやり直してください。",
+          e instanceof Error ? e.message : YOUTUBE_TOKEN_MISSING_MESSAGE,
       },
+      { status: 500 },
+    );
+  }
+  if (!accessToken) {
+    return NextResponse.json(
+      { error: YOUTUBE_TOKEN_MISSING_MESSAGE },
       { status: 400 },
     );
   }
@@ -45,17 +60,25 @@ export async function POST(request: Request) {
   }
 
   try {
-    const allPlaylists = await listMinePlaylists(accessToken);
-    const selected = allPlaylists.filter((p) => playlistIds.includes(p.id));
+    const selected = await getPlaylistsByIds(accessToken, playlistIds);
     if (selected.length === 0) {
       return NextResponse.json(
-        { error: "選択したプレイリストが見つかりません" },
+        {
+          error:
+            "選択したプレイリストが見つかりません。公開設定や URL を確認してください。",
+        },
         { status: 404 },
       );
     }
 
+    // リクエスト順を保つ（見つかったものだけ）
+    const byId = new Map(selected.map((p) => [p.id, p]));
+    const ordered = playlistIds
+      .map((id) => byId.get(id))
+      .filter((p): p is NonNullable<typeof p> => Boolean(p));
+
     const videos = [];
-    for (const playlist of selected) {
+    for (const playlist of ordered) {
       const items = await listPlaylistVideoSnippets(
         accessToken,
         playlist.id,
@@ -64,34 +87,47 @@ export async function POST(request: Request) {
       videos.push(...items);
     }
 
-    let analysis = buildPlaylistAnalysis(
-      selected.map((p) => ({ id: p.id, title: p.title })),
-      videos,
-    );
-
-    const { data: correctionRows } = await supabase
+    const { data: correctionRows, error: correctionsError } = await supabase
       .from("artist_corrections")
       .select("kind, raw_name, canonical_name, split_into")
       .eq("user_id", session.user.id)
       .order("created_at", { ascending: true })
       .limit(500);
 
-    if (correctionRows && correctionRows.length > 0) {
-      const applied = applyArtistCorrections(
-        {
-          confirmed: analysis.artists,
-          unclassified: analysis.unclassifiedArtists ?? [],
-          similarPairs: analysis.similarPairs ?? [],
-        },
-        correctionRows as ArtistCorrection[],
-      );
-      analysis = {
-        ...analysis,
-        artists: applied.confirmed,
-        unclassifiedArtists: applied.unclassified,
-        similarPairs: applied.similarPairs,
-      };
+    if (correctionsError) {
+      if (isMissingRelationError(correctionsError, "artist_corrections")) {
+        return NextResponse.json(
+          {
+            error:
+              "artist_corrections テーブルがありません。supabase/migrations/20260805000000_artist_corrections.sql を SQL Editor で実行してください。",
+          },
+          { status: 500 },
+        );
+      }
+      throw new Error(correctionsError.message);
     }
+
+    const overrides =
+      correctionRows && correctionRows.length > 0
+        ? buildOverrides(
+            correctionRows.map((row) =>
+              correctionFromDbRow(
+                row as {
+                  kind: string;
+                  raw_name: string;
+                  canonical_name?: string | null;
+                  split_into?: string[] | null;
+                },
+              ),
+            ),
+          )
+        : EMPTY_OVERRIDES;
+
+    const analysis = buildPlaylistAnalysis(
+      ordered.map((p) => ({ id: p.id, title: p.title })),
+      videos,
+      overrides,
+    );
 
     const { error: updateError } = await supabase
       .from("profiles")
@@ -126,13 +162,12 @@ export async function POST(request: Request) {
       artistCount: analysis.artists.length,
     });
   } catch (error) {
+    const raw =
+      error instanceof Error
+        ? error.message
+        : "プレイリスト解析に失敗しました";
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "プレイリスト解析に失敗しました",
-      },
+      { error: mapYouTubeApiErrorMessage(raw) },
       { status: 502 },
     );
   }

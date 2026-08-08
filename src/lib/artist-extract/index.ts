@@ -10,13 +10,24 @@ import {
   normalizeArtistName,
   type AliasDictionary,
   type ArtistDict,
-  ARTIST_DICT,
   dictKey,
 } from "./normalize";
+import {
+  EMPTY_OVERRIDES,
+  expandUserSplits,
+  isRejectedName,
+  isUserConfirmedName,
+  mergeDictionaryWithOverrides,
+  type ArtistOverrides,
+} from "./overrides";
+import { resolveFranchiseArtists } from "./groups";
 import { splitArtistCandidates } from "./split";
 import {
   isBlockedName,
   validateArtistNames,
+  type AggregateResult,
+  type ArtistAdoptedBy,
+  type ArtistEvidence,
   type SimilarPair,
   type UnclassifiedItem,
   type ValidationResult,
@@ -29,6 +40,7 @@ export type ArtistExtractInput = {
   dictionary?: AliasDictionary;
   dict?: ArtistDict;
   useClaudeFallback?: boolean;
+  overrides?: ArtistOverrides;
 };
 
 export type ArtistExtractResult = {
@@ -49,17 +61,27 @@ export type CandidateMeta = {
 };
 
 function resolveDictionary(input: ArtistExtractInput): AliasDictionary {
-  if (input.dictionary) return input.dictionary;
-  if (input.dict) {
+  let base: AliasDictionary;
+  if (input.dictionary) {
+    base = input.dictionary;
+  } else if (input.dict) {
     const inverted: AliasDictionary = {};
     for (const [aliasKey, canonical] of Object.entries(input.dict)) {
       const list = inverted[canonical] ?? [];
       if (!list.includes(aliasKey)) list.push(aliasKey);
       inverted[canonical] = list;
     }
-    return inverted;
+    base = inverted;
+  } else {
+    base = ALIAS_DICTIONARY;
   }
-  return ALIAS_DICTIONARY;
+
+  const overrides = input.overrides ?? EMPTY_OVERRIDES;
+  return mergeDictionaryWithOverrides(base, overrides);
+}
+
+function resolveOverrides(input: ArtistExtractInput): ArtistOverrides {
+  return input.overrides ?? EMPTY_OVERRIDES;
 }
 
 type Collected = {
@@ -70,14 +92,29 @@ type Collected = {
 function collectFromSegments(
   segments: string[],
   dictionary: AliasDictionary,
+  overrides: ArtistOverrides,
 ): Collected {
   const names: string[] = [];
   const unclassified: UnclassifiedItem[] = [];
-  const lookup = buildAliasLookup(dictionary);
 
   for (const seg of segments) {
     const cleanedSeg = cleanExtractedName(seg);
     if (!cleanedSeg) continue;
+
+    // ユーザー分割が最優先
+    const userSplit = expandUserSplits(cleanedSeg, overrides.splits);
+    if (userSplit.length >= 2) {
+      for (const part of userSplit) {
+        const cleaned = cleanExtractedName(part);
+        if (!cleaned) continue;
+        if (isRejectedName(cleaned, overrides.rejected)) continue;
+        const normalized = normalizeArtistName(cleaned, dictionary);
+        if (!normalized) continue;
+        if (isRejectedName(normalized, overrides.rejected)) continue;
+        names.push(normalized);
+      }
+      continue;
+    }
 
     // 中黒のみで繋がる曖昧名は未分類へ（split 側が条件付き分割）
     if (
@@ -102,13 +139,15 @@ function collectFromSegments(
       }
     }
     for (const part of split.artists) {
-      const cleaned = cleanExtractedName(part);
-      if (!cleaned) continue;
-      const normalized = normalizeArtistName(cleaned, dictionary);
-      if (!normalized) continue;
-      // aliasHit は呼び出し側で判定
-      void lookup;
-      names.push(normalized);
+      for (const expanded of expandUserSplits(part, overrides.splits)) {
+        const cleaned = cleanExtractedName(expanded);
+        if (!cleaned) continue;
+        if (isRejectedName(cleaned, overrides.rejected)) continue;
+        const normalized = normalizeArtistName(cleaned, dictionary);
+        if (!normalized) continue;
+        if (isRejectedName(normalized, overrides.rejected)) continue;
+        names.push(normalized);
+      }
     }
   }
 
@@ -135,14 +174,48 @@ type VideoExtract = {
   channelNames: string[];
   unclassified: UnclassifiedItem[];
   confidence: "high" | "low";
+  franchiseKind: "solo" | "unit" | "group" | "none";
 };
 
 function extractVideoCandidates(
   input: ArtistExtractInput,
 ): VideoExtract {
   const dictionary = resolveDictionary(input);
+  const overrides = resolveOverrides(input);
   const title = input.title?.trim() ?? "";
   const channelTitle = input.channelTitle?.trim() ?? "";
+
+  // フランチャイズ優先（ソロ > ユニット > グループのみ）。該当時は通常抽出を上書き
+  const franchise = resolveFranchiseArtists(title, channelTitle, dictionary);
+  if (franchise.kind !== "none") {
+    const highNames =
+      franchise.kind === "solo"
+        ? franchise.artists.filter(
+            (n) => !franchise.group || dictKey(n) !== dictKey(franchise.group),
+          )
+        : franchise.kind === "unit"
+          ? [...franchise.artists]
+          : [];
+    const channelNames =
+      franchise.kind === "group"
+        ? [...franchise.artists]
+        : franchise.kind === "solo" && franchise.group
+          ? [franchise.group]
+          : [];
+
+    return {
+      highNames: highNames.filter(
+        (n) => !isRejectedName(n, overrides.rejected),
+      ),
+      lowNames: [],
+      channelNames: channelNames.filter(
+        (n) => !isRejectedName(n, overrides.rejected),
+      ),
+      unclassified: [],
+      confidence: "high",
+      franchiseKind: franchise.kind,
+    };
+  }
 
   const fromTitle = title
     ? extractTitleSegments(title)
@@ -156,9 +229,13 @@ function extractVideoCandidates(
   const lowSegs =
     fromTitle.confidence === "low" ? fromTitle.segments : [];
 
-  const high = collectFromSegments(highSegs, dictionary);
-  const low = collectFromSegments(lowSegs, dictionary);
-  const channel = collectFromSegments(fromChannel.segments, dictionary);
+  const high = collectFromSegments(highSegs, dictionary, overrides);
+  const low = collectFromSegments(lowSegs, dictionary, overrides);
+  const channel = collectFromSegments(
+    fromChannel.segments,
+    dictionary,
+    overrides,
+  );
 
   let confidence: "high" | "low" = "low";
   if (highSegs.length > 0) confidence = "high";
@@ -173,8 +250,9 @@ function extractVideoCandidates(
       ...high.unclassified,
       ...low.unclassified,
       ...channel.unclassified,
-    ],
+    ].filter((u) => !isRejectedName(u.name, overrides.rejected)),
     confidence,
+    franchiseKind: "none",
   };
 }
 
@@ -185,6 +263,7 @@ export function extractArtistsFromVideo(
   input: ArtistExtractInput,
 ): ArtistExtractResult {
   const dictionary = resolveDictionary(input);
+  const overrides = resolveOverrides(input);
   const lookup = buildAliasLookup(dictionary);
   const extracted = extractVideoCandidates(input);
 
@@ -192,6 +271,7 @@ export function extractArtistsFromVideo(
   const weak: UnclassifiedItem[] = [];
 
   const pushConfirmed = (name: string) => {
+    if (isRejectedName(name, overrides.rejected)) return;
     if (!isBlockedName(name)) confirmedSeed.push(name);
   };
 
@@ -199,19 +279,29 @@ export function extractArtistsFromVideo(
   for (const name of extracted.highNames) pushConfirmed(name);
 
   for (const name of extracted.lowNames) {
-    // エイリアスヒットなら確定扱い
-    if (lookup.has(dictKey(name))) {
+    if (isRejectedName(name, overrides.rejected)) continue;
+    // エイリアスヒット or ユーザー確認なら確定扱い
+    if (
+      lookup.has(dictKey(name)) ||
+      isUserConfirmedName(name, overrides.confirmed)
+    ) {
       pushConfirmed(name);
       continue;
     }
     // low 単独は確定にしない
-    if (!extracted.channelNames.includes(name) && !extracted.highNames.includes(name)) {
+    if (
+      !extracted.channelNames.includes(name) &&
+      !extracted.highNames.includes(name)
+    ) {
       weak.push({
         name,
         reasons: ["低自信度のタイトル抽出（単独では未確定）"],
       });
     }
   }
+
+  // ユーザー confirm で未出現の名前はここでは追加しない（集約側で扱う）
+  // グループ全員展開はしない（extractVideoCandidates 内の franchise 解決に委譲）
 
   const validation = validateArtistNames(confirmedSeed, [
     ...extracted.unclassified,
@@ -224,16 +314,21 @@ export function extractArtistsFromVideo(
 /**
  * 複数動画分をまとめて検証（PL解析用）
  * 採用基準:
- * 1. エイリアス辞書ヒット
+ * 1. エイリアス辞書ヒット（ユーザー override 含む）
  * 2. チャンネル名由来
  * 3. confidence high 由来
  * 4. 2曲以上で出現
+ * 5. ユーザー confirm
  */
 export function aggregateValidatedArtists(
   videos: { title: string; channelTitle: string }[],
   dictionary?: AliasDictionary,
-): ValidationResult {
-  const dict = dictionary ?? ALIAS_DICTIONARY;
+  overrides: ArtistOverrides = EMPTY_OVERRIDES,
+): AggregateResult {
+  const dict = mergeDictionaryWithOverrides(
+    dictionary ?? ALIAS_DICTIONARY,
+    overrides,
+  );
   const lookup = buildAliasLookup(dict);
 
   type Acc = {
@@ -242,6 +337,9 @@ export function aggregateValidatedArtists(
     fromChannel: boolean;
     highConfidence: boolean;
     aliasHit: boolean;
+    fromUnit: boolean;
+    sampleTitle: string | null;
+    sampleChannel: string | null;
   };
 
   const acc = new Map<string, Acc>();
@@ -249,15 +347,24 @@ export function aggregateValidatedArtists(
 
   const bump = (
     name: string,
-    flags: Partial<Omit<Acc, "name" | "occurrences">>,
+    flags: Partial<
+      Omit<Acc, "name" | "occurrences" | "sampleTitle" | "sampleChannel">
+    >,
+    meta?: { title?: string; channel?: string },
   ) => {
+    if (isRejectedName(name, overrides.rejected)) return;
     const k = dictKey(name);
     const prev = acc.get(k);
+    const title = meta?.title?.trim() || null;
+    const channel = meta?.channel?.trim() || null;
     if (prev) {
       prev.occurrences += 1;
       prev.fromChannel ||= Boolean(flags.fromChannel);
       prev.highConfidence ||= Boolean(flags.highConfidence);
       prev.aliasHit ||= Boolean(flags.aliasHit) || lookup.has(k);
+      prev.fromUnit ||= Boolean(flags.fromUnit);
+      if (!prev.sampleTitle && title) prev.sampleTitle = title;
+      if (!prev.sampleChannel && channel) prev.sampleChannel = channel;
     } else {
       acc.set(k, {
         name,
@@ -265,45 +372,69 @@ export function aggregateValidatedArtists(
         fromChannel: Boolean(flags.fromChannel),
         highConfidence: Boolean(flags.highConfidence),
         aliasHit: Boolean(flags.aliasHit) || lookup.has(k),
+        fromUnit: Boolean(flags.fromUnit),
+        sampleTitle: title,
+        sampleChannel: channel,
       });
     }
   };
 
   for (const video of videos) {
+    const meta = { title: video.title, channel: video.channelTitle };
     const extracted = extractVideoCandidates({
       title: video.title,
       channelTitle: video.channelTitle,
       dictionary: dict,
+      overrides,
     });
+    const fromUnit = extracted.franchiseKind === "unit";
 
     for (const name of extracted.channelNames) {
-      bump(name, { fromChannel: true, highConfidence: true });
+      bump(name, { fromChannel: true, highConfidence: true }, meta);
     }
     for (const name of extracted.highNames) {
-      bump(name, { highConfidence: true });
+      bump(
+        name,
+        { highConfidence: true, fromUnit },
+        meta,
+      );
     }
     for (const name of extracted.lowNames) {
-      bump(name, { highConfidence: false });
+      bump(name, { highConfidence: false }, meta);
     }
     for (const item of extracted.unclassified) {
+      if (isRejectedName(item.name, overrides.rejected)) continue;
+      bump(item.name, { highConfidence: false }, meta);
       if (!unclassifiedMap.has(item.name)) {
         unclassifiedMap.set(item.name, item);
       }
     }
   }
 
+  const resolveAdoptedBy = (item: Acc): ArtistAdoptedBy => {
+    if (isUserConfirmedName(item.name, overrides.confirmed)) return "confirm";
+    if (item.fromUnit) return "unit";
+    if (item.aliasHit) return "alias";
+    if (item.fromChannel) return "channel";
+    if (item.occurrences >= 2) return "multi";
+    if (item.highConfidence) return "high";
+    return "unknown";
+  };
+
   const confirmed: string[] = [];
   for (const item of acc.values()) {
     if (isBlockedName(item.name)) continue;
+    if (isRejectedName(item.name, overrides.rejected)) continue;
 
     const adopt =
       item.aliasHit ||
       item.fromChannel ||
       item.highConfidence ||
-      item.occurrences >= 2;
+      item.occurrences >= 2 ||
+      item.fromUnit ||
+      isUserConfirmedName(item.name, overrides.confirmed);
 
     if (adopt) {
-      // 異常検出は validate に任せるため一旦リストへ
       confirmed.push(item.name);
     } else {
       unclassifiedMap.set(item.name, {
@@ -313,7 +444,55 @@ export function aggregateValidatedArtists(
     }
   }
 
-  return validateArtistNames(confirmed, [...unclassifiedMap.values()]);
+  const validated = validateArtistNames(confirmed, [
+    ...unclassifiedMap.values(),
+  ]);
+
+  const finalConfirmed = validated.confirmed.filter(
+    (n) => !isRejectedName(n, overrides.rejected),
+  );
+  const finalUnclassified = validated.unclassified.filter(
+    (u) => !isRejectedName(u.name, overrides.rejected),
+  );
+  const finalSimilar = validated.similarPairs.filter(
+    (p) =>
+      !isRejectedName(p.a, overrides.rejected) &&
+      !isRejectedName(p.b, overrides.rejected),
+  );
+
+  const evidenceNames = new Set([
+    ...finalConfirmed,
+    ...finalUnclassified.map((u) => u.name),
+  ]);
+  const evidence: ArtistEvidence[] = [];
+  for (const name of evidenceNames) {
+    const item = acc.get(dictKey(name));
+    if (item) {
+      evidence.push({
+        name: item.name,
+        sampleTitle: item.sampleTitle,
+        sampleChannel: item.sampleChannel,
+        occurrenceCount: item.occurrences,
+        adoptedBy: resolveAdoptedBy(item),
+      });
+    } else {
+      evidence.push({
+        name,
+        sampleTitle: null,
+        sampleChannel: null,
+        occurrenceCount: 1,
+        adoptedBy: "unknown",
+      });
+    }
+  }
+  evidence.sort((a, b) => a.name.localeCompare(b.name, "ja"));
+
+  return {
+    confirmed: finalConfirmed,
+    unclassified: finalUnclassified,
+    similarPairs: finalSimilar,
+    evidence,
+  };
 }
 
 export async function extractArtistsFromVideoAsync(
@@ -335,7 +514,8 @@ export async function extractArtistsFromVideoAsync(
   if (fromClaude && fromClaude.length > 0) {
     const names = fromClaude
       .map((n) => normalizeArtistName(n, resolveDictionary(input)))
-      .filter(Boolean);
+      .filter(Boolean)
+      .filter((n) => !isRejectedName(n, resolveOverrides(input).rejected));
     const validation = validateArtistNames(names);
     return toResult(validation, "high", "claude");
   }
@@ -367,5 +547,17 @@ export {
   isBlockedName,
   detectAnomalies,
 } from "./validate";
+export {
+  buildOverrides,
+  correctionFromDbRow,
+  EMPTY_OVERRIDES,
+  mergeDictionaryWithOverrides,
+  expandUserSplits,
+} from "./overrides";
+export { expandGroupMembers, getGroupMembers, GROUP_MEMBERS, UNIT_MEMBERS, resolveFranchiseArtists } from "./groups";
 export type { AliasDictionary, ArtistDict } from "./normalize";
-export type { UnclassifiedItem, SimilarPair, ValidationResult } from "./validate";
+export type { UnclassifiedItem, SimilarPair, ValidationResult, AggregateResult, ArtistEvidence, ArtistAdoptedBy } from "./validate";
+export type {
+  ArtistCorrection as PipelineArtistCorrection,
+  ArtistOverrides,
+} from "./overrides";

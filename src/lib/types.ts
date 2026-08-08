@@ -44,6 +44,7 @@ export type Profile = {
   avatarUrl: string | null;
   youtubeChannelId: string | null;
   onboardingCompleted: boolean;
+  termsAcceptedAt: string | null;
   favoriteArtists: string[];
   favoriteGenres: string[];
   preferences: UserPreferences;

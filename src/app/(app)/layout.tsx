@@ -1,5 +1,5 @@
-import Link from "next/link";
-import { APP_NAME } from "@/lib/constants";
+import { AppHeader } from "@/components/layout/AppHeader";
+import { SiteFooter } from "@/components/layout/SiteFooter";
 
 export default function AppLayout({
   children,
@@ -7,35 +7,10 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-dvh bg-[#f7f3ec] text-[#1a1612]">
-      <header className="border-b border-[#1a1612]/10">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-          <Link
-            href="/"
-            className="font-[family-name:var(--font-display)] text-xl tracking-tight"
-          >
-            {APP_NAME}
-          </Link>
-          <nav className="flex flex-wrap gap-4 text-sm sm:gap-5">
-            <Link href="/" className="hover:opacity-70">
-              ホーム
-            </Link>
-            <Link href="/settings/tastes" className="hover:opacity-70">
-              好み
-            </Link>
-            <Link href="/settings/playlists" className="hover:opacity-70">
-              PL解析
-            </Link>
-            <Link href="/settings" className="hover:opacity-70">
-              設定
-            </Link>
-            <Link href="/me" className="hover:opacity-70">
-              マイページ
-            </Link>
-          </nav>
-        </div>
-      </header>
-      {children}
+    <div className="flex min-h-dvh flex-col bg-[#0a0b0d] text-[#e8dfd0]">
+      <AppHeader />
+      <div className="flex-1">{children}</div>
+      <SiteFooter />
     </div>
   );
 }

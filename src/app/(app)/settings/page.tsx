@@ -29,6 +29,7 @@ export default async function SettingsPage() {
         avatarUrl: (user.user_metadata?.avatar_url as string | undefined) ?? null,
         youtubeChannelId: null,
         onboardingCompleted: false,
+        termsAcceptedAt: null,
         favoriteArtists: [],
         favoriteGenres: [],
         preferences: DEFAULT_PREFERENCES,
@@ -42,7 +43,7 @@ export default async function SettingsPage() {
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
       <h1 className="font-[family-name:var(--font-display)] text-4xl">設定</h1>
-      <p className="mt-3 text-[#1a1612]/65">
+      <p className="mt-3 text-[#e8dfd0]/65">
         生成の好みや曲数をいつでも変えられます。
       </p>
       <div className="mt-10">

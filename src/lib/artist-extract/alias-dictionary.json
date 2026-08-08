@@ -1,34 +1,989 @@
 {
-  "星街すいせい": ["suisei", "Suisei", "Suisei Channel", "hoshimachisuisei", "Hoshimachi Suisei"],
-  "初星学園": [
-    "Hatsuboshi Gakuen",
-    "Hatsuhoshi Gakuen",
-    "hatsuhoshi",
-    "hatsuboshi",
-    "gakuenidolmaster",
-    "gakumas"
+  "+α/あるふぁきゅん。": [
+    "Alfakyun."
   ],
-  "花海咲季": ["hanamisaki", "Hanami Saki"],
-  "月村手毬": ["tsukimuratemari", "Tsukimura Temari"],
-  "藤田ことね": ["fujitakotone", "Fujita Kotone"],
-  "有村麻央": ["arimuramao", "Arimura Mao"],
-  "葛城リーリヤ": ["katsuragililja", "katsuragililya", "Katsuragi Lilja"],
-  "倉本千奈": ["kuramotochina", "Kuramoto China"],
-  "紫雲清夏": ["shiunsumika", "Shiun Sumika"],
-  "篠澤広": ["shinosawahiro", "Shinosawa Hiro"],
-  "姫崎莉波": ["himesakirinami", "Himesaki Rinami"],
-  "花海佑芽": ["hanamiume", "Hanami Ume"],
-  "秦谷美鈴": ["hatayamisuzu", "Hataya Misuzu"],
-  "十王星南": ["juousena", "juosena", "Juou Sena"],
-  "雨夜燕": ["amayatsubame", "Amaya Tsubame"],
-  "イトグルマ": ["itoguruma", "itoguruuma", "ITOGURUMA"],
-  "リーン": ["leen", "Leen"],
-  "上坂すみれ": ["sumireuesaka", "uesakasumire", "Sumire Uesaka"],
-  "空澄セナ": ["asumisena", "senaasumi", "Asumi Sena"],
-  "Calliope Mori": ["calliopemori", "moricalliope", "Mori Calliope"],
-  "Gawr Gura": ["gawrgura"],
-  "DECO*27": ["deco27", "deco*27"],
-  "HoneyWorks": ["honeyworks"],
-  "音莉飴": ["otonriame", "otoname"],
-  "天月": ["あまつき", "Amatsuki"]
+  "765PRO ALLSTARS": [],
+  "96猫": [
+    "96neko"
+  ],
+  "Ado": [],
+  "Aimer": [],
+  "Aqours": [],
+  "B'z": [],
+  "BABYMETAL": [],
+  "back number": [],
+  "BUMP OF CHICKEN": [],
+  "DECO*27": [
+    "deco*27",
+    "deco27"
+  ],
+  "DOLLCHESTRA": [],
+  "DRAMATIC STARS": [],
+  "E-girls": [],
+  "Eve": [],
+  "EXILE": [],
+  "Gero": [],
+  "GLAY": [],
+  "GReeeeN": [],
+  "HoneyWorks": [
+    "honeyworks"
+  ],
+  "Junky": [
+    "Junky // Clover lab."
+  ],
+  "Jupiter": [],
+  "King Gnu": [],
+  "KinKi Kids": [],
+  "koma'n": [],
+  "L'Arc〜en〜Ciel": [],
+  "Liella!": [],
+  "LiPPS": [],
+  "LiSA": [],
+  "luz": [],
+  "Mr.Children": [],
+  "Mrs. GREEN APPLE": [],
+  "new generations": [],
+  "Official髭男dism": [
+    "Official HIGEDAN dism"
+  ],
+  "ONE OK ROCK": [],
+  "Perfume": [],
+  "P丸様。": [
+    "P-maru-sama."
+  ],
+  "RADWIMPS": [],
+  "Reol": [],
+  "SMAP": [],
+  "Sou": [],
+  "supercell": [],
+  "un:c": [],
+  "Vaundy": [],
+  "X JAPAN": [],
+  "YOASOBI": [],
+  "アイドルマスター": [
+    "765PRO",
+    "765PRO ALLSTARS",
+    "765プロ",
+    "Idolmaster",
+    "THE IDOLM@STER",
+    "アイマス"
+  ],
+  "アイドルマスター SideM": [
+    "Idolmaster SideM",
+    "SideM",
+    "サイマス"
+  ],
+  "アイドルマスター シャイニーカラーズ": [
+    "Shiny Colors",
+    "シャイニーカラーズ",
+    "シャニマス"
+  ],
+  "アイドルマスター シンデレラガールズ": [
+    "Cinderella Girls",
+    "IMAS CG",
+    "シンデレラガールズ",
+    "デレマス"
+  ],
+  "アイドルマスター ミリオンライブ！": [
+    "Million Live",
+    "ミリオンライブ",
+    "ミリマス"
+  ],
+  "あいみょん": [
+    "Aimyon"
+  ],
+  "あらき": [
+    "Araki"
+  ],
+  "アルストロメリア": [],
+  "アンジュ・カトリーナ": [
+    "Ange Katrina"
+  ],
+  "アンダーバー": [
+    "Underbar"
+  ],
+  "アンティーカ": [],
+  "イキヅライブ！ LOVELIVE! BLUEBIRD": [
+    "Ikizulive",
+    "LOVELIVE BLUEBIRD",
+    "イキヅライブ",
+    "いきづらい部"
+  ],
+  "いきづらい部！": [],
+  "いきものがかり": [
+    "Ikimonogakari"
+  ],
+  "イトグルマ": [
+    "itoguruma",
+    "ITOGURUMA",
+    "itoguruuma"
+  ],
+  "イルミネーションスターズ": [],
+  "ウィーン・マルガレーテ": [
+    "Margarete Wien"
+  ],
+  "ウォルピスカーター": [
+    "Wolpis Carter"
+  ],
+  "うらたぬき": [
+    "Uratanuki"
+  ],
+  "エマ・ヴェルデ": [
+    "Emma Verde"
+  ],
+  "エミリースチュアート": [
+    "Emily Stewart"
+  ],
+  "がうる・ぐら": [
+    "Gawr Gura"
+  ],
+  "クプラ": [
+    "Cupula"
+  ],
+  "ぐるたみん": [
+    "Glutamine"
+  ],
+  "けったろ": [
+    "Kettaro"
+  ],
+  "コブクロ": [
+    "Kobukuro"
+  ],
+  "こぼ・かなえる": [
+    "Kobo Kanaeru"
+  ],
+  "コメティック": [],
+  "ころん": [
+    "Colon"
+  ],
+  "サカナクション": [
+    "Sakanaction"
+  ],
+  "さくらみこ": [
+    "Sakura Miko"
+  ],
+  "サザンオールスターズ": [
+    "Southern All Stars"
+  ],
+  "さとみ": [
+    "Satomi"
+  ],
+  "シーズ": [],
+  "ジェル": [
+    "Jel"
+  ],
+  "しゅーず": [
+    "Shoose"
+  ],
+  "ずっと真夜中でいいのに。": [
+    "ZUTOMAYO"
+  ],
+  "ストレイライト": [],
+  "ストロベリーポップムーン": [],
+  "スピッツ": [
+    "Spitz"
+  ],
+  "スリーズブーケ": [],
+  "センラ": [
+    "Senra"
+  ],
+  "そらる": [
+    "Soraru"
+  ],
+  "タイツォン": [
+    "Taitson"
+  ],
+  "ときのそら": [
+    "ときのそら 6th Anniversary Party「Keep Shinin'」",
+    "ときのそら「Beyond」",
+    "ときのそら「スタースタースタート」"
+  ],
+  "となりの坂田。": [
+    "Tonari no Sakata."
+  ],
+  "ななもり。": [
+    "Nanamori."
+  ],
+  "なみりん": [
+    "Namirin"
+  ],
+  "ノクチル": [],
+  "ピーナッツくん": [
+    "Peanuts-kun"
+  ],
+  "ピコ": [
+    "Piko"
+  ],
+  "ポルノグラフィティ": [
+    "Porno Graffitti"
+  ],
+  "ぽんぽこ": [
+    "Ponpoko"
+  ],
+  "まじ娘": [
+    "Majiko"
+  ],
+  "まふまふ": [
+    "Mafumafu"
+  ],
+  "ミア・テイラー": [
+    "Mia Taylor"
+  ],
+  "みーちゃん": [
+    "Michan"
+  ],
+  "みらくらぱーく！": [],
+  "めいちゃん": [
+    "Meychan"
+  ],
+  "メガテラ・ゼロ": [
+    "Megatera Zero"
+  ],
+  "ゆず": [
+    "Yuzu"
+  ],
+  "ヨルシカ": [
+    "Yorushika"
+  ],
+  "ラブライブ！": [
+    "Love Live",
+    "μ's",
+    "μ'sシリーズ"
+  ],
+  "ラブライブ！サンシャイン!!": [
+    "Aqours",
+    "Aqoursシリーズ",
+    "Love Live Sunshine"
+  ],
+  "ラブライブ！スーパースター!!": [
+    "Liella",
+    "Love Live Superstar"
+  ],
+  "ラブライブ！虹ヶ咲学園スクールアイドル同好会": [
+    "Love Live Nijigasaki",
+    "Nijigasaki",
+    "ニジガク",
+    "虹ヶ咲",
+    "虹ヶ咲学園スクールアイドル同好会"
+  ],
+  "ラブライブ！蓮ノ空女学院スクールアイドルクラブ": [
+    "Hasunosora",
+    "Love Live Hasunosora",
+    "蓮ノ空"
+  ],
+  "リーン": [
+    "leen",
+    "Leen"
+  ],
+  "リゼ・ヘルエスタ": [
+    "Lize Helesta"
+  ],
+  "りぶ": [
+    "Rib"
+  ],
+  "るぅと": [
+    "Root"
+  ],
+  "ロボ子さん": [
+    "Roboco"
+  ],
+  "ろん": [
+    "Lon"
+  ],
+  "ヲタみん": [
+    "Wotamin"
+  ],
+  "絢瀬絵里": [
+    "Eli Ayase"
+  ],
+  "安室奈美恵": [
+    "Namie Amuro"
+  ],
+  "安養寺姫芽": [
+    "Hime Anyoji"
+  ],
+  "伊集院北斗": [
+    "Hokuto Ijuin"
+  ],
+  "伊吹翼": [
+    "Tsubasa Ibuki"
+  ],
+  "伊東歌詞太郎": [
+    "Ito Kashitaro"
+  ],
+  "郁田はるき": [
+    "Haruki Ikuta"
+  ],
+  "一ノ瀬志希": [
+    "Shiki Ichinose"
+  ],
+  "壱百満天原サロメ": [
+    "Hyakumantenbara Salome"
+  ],
+  "宇多田ヒカル": [
+    "Hikaru Utada"
+  ],
+  "雨夜燕": [
+    "Amaya Tsubame",
+    "amayatsubame",
+    "Tsubame Amaya"
+  ],
+  "園田海未": [
+    "Umi Sonoda"
+  ],
+  "園田智代子": [
+    "Chiyoko Sonoda"
+  ],
+  "塩見周子": [
+    "Syuko Shiomi"
+  ],
+  "乙宗梢": [
+    "Kozue Otomune"
+  ],
+  "音莉飴": [
+    "otoname",
+    "otonriame"
+  ],
+  "花たん": [
+    "Hanatan"
+  ],
+  "花芽すみれ": [
+    "花芽すみれ / Kaga Sumire"
+  ],
+  "花海咲季": [
+    "Hanami Saki",
+    "hanamisaki",
+    "Saki Hanami"
+  ],
+  "花海佑芽": [
+    "Hanami Ume",
+    "hanamiume",
+    "Ume Hanami"
+  ],
+  "花咲夜": [],
+  "我那覇響": [
+    "Hibiki Ganaha"
+  ],
+  "角巻わため": [
+    "Tsunomaki Watame"
+  ],
+  "葛城リーリヤ": [
+    "Katsuragi Lilja",
+    "Katsuragi Ririya",
+    "katsuragililja",
+    "katsuragililya",
+    "Lilja Katsuragi"
+  ],
+  "葛葉": [
+    "Kuzuha"
+  ],
+  "叶": [
+    "Kanae"
+  ],
+  "鬼塚夏美": [
+    "Natsumi Onitsuka"
+  ],
+  "鬼塚冬毬": [
+    "Tomari Onitsuka"
+  ],
+  "菊地真": [
+    "Makoto Kikuchi"
+  ],
+  "橘ひなの": [
+    "橘ひなの / Hinano Tachibana"
+  ],
+  "宮下愛": [
+    "Ai Miyashita"
+  ],
+  "宮本フレデリカ": [
+    "Frederica Miyamoto"
+  ],
+  "芹沢あさひ": [
+    "Asahi Serizawa"
+  ],
+  "近江彼方": [
+    "Kanata Konoe"
+  ],
+  "金澤奇跡": [
+    "Miracle Kanazawa"
+  ],
+  "駒形花火": [
+    "Hanabi Komagata"
+  ],
+  "空澄セナ": [
+    "Asumi Sena",
+    "asumisena",
+    "senaasumi",
+    "空澄セナ -Asumi Sena-",
+    "空澄セナ 『推しの子』OP"
+  ],
+  "桑山千雪": [
+    "Chiyuki Kuwayama"
+  ],
+  "月ノ美兎": [
+    "Tsukino Mito"
+  ],
+  "月岡恋鐘": [
+    "Kogane Tsukioka"
+  ],
+  "月村手毬": [
+    "Temari Tsukimura",
+    "Tsukimura Temari",
+    "tsukimuratemari"
+  ],
+  "健屋花那": [
+    "Sukoya Kana"
+  ],
+  "剣持刀也": [
+    "Kenmochi Toya"
+  ],
+  "五桐玲": [
+    "Akira Gotou"
+  ],
+  "御手洗翔太": [
+    "Shota Mitarai"
+  ],
+  "倖田來未": [
+    "Kumi Koda"
+  ],
+  "甲斐田晴": [
+    "Kaida Haru"
+  ],
+  "高海千歌": [
+    "Chika Takami"
+  ],
+  "高橋ポルカ": [
+    "Polka Takahashi"
+  ],
+  "高坂穂乃果": [
+    "Honoka Kosaka"
+  ],
+  "高槻やよい": [
+    "Yayoi Takatsuki"
+  ],
+  "国木田花丸": [
+    "Hanamaru Kunikida"
+  ],
+  "黒澤ダイヤ": [
+    "Dia Kurosawa"
+  ],
+  "黒澤ルビィ": [
+    "Ruby Kurosawa"
+  ],
+  "此花輝夜": [
+    "Aurora Konohana"
+  ],
+  "佐々木翔音": [
+    "Shion Sasaki"
+  ],
+  "沙花叉クロヱ": [
+    "Sakamata Chloe"
+  ],
+  "最上静香": [
+    "Shizuka Mogami"
+  ],
+  "桜坂しずく": [
+    "Shizuku Osaka"
+  ],
+  "桜小路きな子": [
+    "Kinako Sakurakoji"
+  ],
+  "桜庭薫": [
+    "Kaoru Sakuraba"
+  ],
+  "桜内梨子": [
+    "Riko Sakurauchi"
+  ],
+  "笹木咲": [
+    "Sasaki Saku"
+  ],
+  "三浦あずさ": [
+    "Azusa Miura"
+  ],
+  "三船栞子": [
+    "Shioriko Mifune"
+  ],
+  "三代目 J SOUL BROTHERS": [
+    "Sandaime J SOUL BROTHERS"
+  ],
+  "三峰結華": [
+    "Yuika Mitsumine"
+  ],
+  "山田真緑": [
+    "Midori Yamada"
+  ],
+  "四条貴音": [
+    "Takane Shijo"
+  ],
+  "市川雛菜": [
+    "Hinana Ichikawa"
+  ],
+  "志麻": [
+    "Shima"
+  ],
+  "獅白ぼたん": [
+    "Shishiro Botan"
+  ],
+  "紫雲清夏": [
+    "Shiun Sumika",
+    "shiunsumika",
+    "Sumika Shiun"
+  ],
+  "紫宮るな": [
+    "紫宮るな /shinomiya runa"
+  ],
+  "紫咲シオン": [
+    "Murasaki Shion"
+  ],
+  "詩人": [
+    "Shijin"
+  ],
+  "鹿乃": [
+    "Kano"
+  ],
+  "七草にちか": [
+    "Nichika Nanakusa"
+  ],
+  "篠澤広": [
+    "Hiro Shinosawa",
+    "Shinosawa Hiro",
+    "shinosawahiro"
+  ],
+  "蛇足": [
+    "Dasoku"
+  ],
+  "若菜四季": [
+    "Shiki Wakana"
+  ],
+  "周央サンゴ": [
+    "Suo Sango"
+  ],
+  "秋月律子": [
+    "Ritsuko Akizuki"
+  ],
+  "十王星南": [
+    "juosena",
+    "Juou Sena",
+    "juousena",
+    "Sena Juo"
+  ],
+  "渋谷ハル": [
+    "Shibuya HAL"
+  ],
+  "渋谷凛": [
+    "Rin Shibuya"
+  ],
+  "春宮ゆくり": [
+    "Yukuri Harumiya"
+  ],
+  "春日未来": [
+    "Mirai Kasuga"
+  ],
+  "初星学園": [
+    "gakuenidolmaster",
+    "gakumas",
+    "hatsuboshi",
+    "Hatsuboshi Gakuen",
+    "hatsuhoshi",
+    "Hatsuhoshi Gakuen",
+    "学マス",
+    "学園アイドルマスター"
+  ],
+  "小宮果穂": [
+    "Kaho Komiya"
+  ],
+  "小原鞠莉": [
+    "Mari Ohara"
+  ],
+  "小雀とと": [
+    "小雀とと / Toto Kogara"
+  ],
+  "小泉花陽": [
+    "Hanayo Koizumi"
+  ],
+  "少年T": [
+    "ShonenT"
+  ],
+  "松浦果南": [
+    "Kanan Matsuura"
+  ],
+  "鐘嵐珠": [
+    "Lanzhu Zhong"
+  ],
+  "上原歩夢": [
+    "Ayumu Uehara"
+  ],
+  "上坂すみれ": [
+    "Sumire Uesaka",
+    "sumireuesaka",
+    "uesakasumire"
+  ],
+  "城ヶ崎美嘉": [
+    "Mika Jougasaki"
+  ],
+  "常闇トワ": [
+    "Tokoyami Towa"
+  ],
+  "森カリオペ": [
+    "Calliope Mori",
+    "Mori Calliope"
+  ],
+  "神成きゅぴ": [
+    "ピノキオピー ed by 神成きゅぴ",
+    "神成きゅぴ / Kaminari Qpi"
+  ],
+  "秦谷美鈴": [
+    "Hataya Misuzu",
+    "hatayamisuzu",
+    "Misuzu Hataya"
+  ],
+  "水瀬伊織": [
+    "Iori Minase"
+  ],
+  "星井美希": [
+    "Miki Hoshii"
+  ],
+  "星街すいせい": [
+    "Hoshimachi Suisei",
+    "hoshimachisuisei",
+    "suisei",
+    "Suisei",
+    "Suisei Channel"
+  ],
+  "星空凛": [
+    "Rin Hoshizora"
+  ],
+  "星川サラ": [
+    "Hoshikawa Sara"
+  ],
+  "星野源": [
+    "Gen Hoshino"
+  ],
+  "西城樹里": [
+    "Juri Saijo"
+  ],
+  "西木野真姫": [
+    "Maki Nishikino"
+  ],
+  "西野カナ": [
+    "Kana Nishino"
+  ],
+  "赤井はあと": [
+    "Akai Haato"
+  ],
+  "赤飯": [
+    "Sekihan"
+  ],
+  "雪花ラミィ": [
+    "Yukihana Lamy"
+  ],
+  "浅倉透": [
+    "Toru Asakura"
+  ],
+  "双海亜美": [
+    "Ami Futami"
+  ],
+  "双海真美": [
+    "Mami Futami"
+  ],
+  "倉本千奈": [
+    "China Kuramoto",
+    "Kuramoto China",
+    "kuramotochina"
+  ],
+  "速水奏": [
+    "Kanade Hayami"
+  ],
+  "村野さやか": [
+    "Sayaka Murano"
+  ],
+  "黛冬優子": [
+    "Fuyuko Mayuzumi"
+  ],
+  "大空スバル": [
+    "Oozora Subaru"
+  ],
+  "大崎甘奈": [
+    "Amana Osaki"
+  ],
+  "大崎甜花": [
+    "Tenka Osaki"
+  ],
+  "大沢瑠璃乃": [
+    "Rurino Osawa"
+  ],
+  "鷹宮リオン": [
+    "Takamiya Rion"
+  ],
+  "中須かすみ": [
+    "Kasumi Nakasu"
+  ],
+  "朝香果林": [
+    "Karin Asaka"
+  ],
+  "調布のりこ": [
+    "Noriko Chofu"
+  ],
+  "超学生": [
+    "Chogakusei"
+  ],
+  "津島善子": [
+    "Yoshiko Tsushima"
+  ],
+  "椎名唯華": [
+    "Shiina Yuika"
+  ],
+  "椎名林檎": [
+    "Ringo Sheena"
+  ],
+  "弟の姉": [
+    "Ototo no Ane"
+  ],
+  "天ヶ瀬冬馬": [
+    "Toma Amagase"
+  ],
+  "天王寺璃奈": [
+    "Rina Tennoji"
+  ],
+  "天音かなた": [
+    "Amane Kanata"
+  ],
+  "天海春香": [
+    "Haruka Amami"
+  ],
+  "天空橋朋花": [
+    "Tomoka Tenkubashi"
+  ],
+  "天月": [
+    "Amatsuki",
+    "あまつき"
+  ],
+  "天道輝": [
+    "Teru Tendo"
+  ],
+  "田中摩美々": [
+    "Mamimi Tanaka"
+  ],
+  "兎田ぺこら": [
+    "Usada Pekora"
+  ],
+  "徒町小鈴": [
+    "Kosuzu Kachimachi"
+  ],
+  "杜野凛世": [
+    "Rinze Morino"
+  ],
+  "渡辺曜": [
+    "You Watanabe"
+  ],
+  "唐可可": [
+    "Keke Tang"
+  ],
+  "島村卯月": [
+    "Uzuki Shimamura"
+  ],
+  "島爺": [
+    "SymaG"
+  ],
+  "東條希": [
+    "Nozomi Tojo"
+  ],
+  "藤井風": [
+    "Fujii Kaze"
+  ],
+  "藤田ことね": [
+    "Fujita Kotone",
+    "fujitakotone",
+    "Kotone Fujita"
+  ],
+  "藤島慈": [
+    "Megumi Fujishima"
+  ],
+  "南ことり": [
+    "Kotori Minami"
+  ],
+  "虹ヶ咲学園スクールアイドル同好会": [],
+  "日向坂46": [
+    "Hinatazaka46"
+  ],
+  "日野下花帆": [
+    "Kaho Hinoshita"
+  ],
+  "如月千早": [
+    "Chihaya Kisaragi"
+  ],
+  "猫汰つな": [
+    "猫汰つな / Nekota Tsuna"
+  ],
+  "乃木坂46": [
+    "Nogizaka46"
+  ],
+  "萩原雪歩": [
+    "Yukiho Hagiwara"
+  ],
+  "柏木翼": [
+    "Tsubasa Kashiwagi"
+  ],
+  "白銀ノエル": [
+    "Shirogane Noel"
+  ],
+  "白上フブキ": [
+    "Shirakami Fubuki"
+  ],
+  "白瀬咲耶": [
+    "Sakuya Shirase"
+  ],
+  "白石紬": [
+    "Tsumugi Shiraishi"
+  ],
+  "白波らむね": [
+    "白波らむね / Shiranami Ramune"
+  ],
+  "八宮めぐる": [
+    "Meguru Hachimiya"
+  ],
+  "斑鳩ルカ": [
+    "Ruka Ikaruga"
+  ],
+  "緋田美琴": [
+    "Mikoto Aketa"
+  ],
+  "樋口円香": [
+    "Madoka Higuchi"
+  ],
+  "樋口楓": [
+    "Higuchi Kaede"
+  ],
+  "尾丸ポルカ": [
+    "Omaru Polka"
+  ],
+  "姫崎莉波": [
+    "Himesaki Rinami",
+    "himesakirinami",
+    "Rinami Himesaki"
+  ],
+  "百鬼あやめ": [
+    "Nakiri Ayame"
+  ],
+  "百生吟子": [
+    "Ginko Momose"
+  ],
+  "浜崎あゆみ": [
+    "Ayumi Hamasaki"
+  ],
+  "不破湊": [
+    "Fuwa Minato"
+  ],
+  "風真いろは": [
+    "Kazama Iroha"
+  ],
+  "風野灯織": [
+    "Hiori Kazano"
+  ],
+  "福丸小糸": [
+    "Koito Fukumaru"
+  ],
+  "平安名すみれ": [
+    "Sumire Heanna"
+  ],
+  "米女メイ": [
+    "Mei Yoneme"
+  ],
+  "米津玄師": [
+    "Kenshi Yonezu"
+  ],
+  "宝鐘マリン": [
+    "Houshou Marine"
+  ],
+  "放課後クライマックスガールズ": [],
+  "本間ひまわり": [
+    "Honma Himawari"
+  ],
+  "本田未央": [
+    "Mio Honda"
+  ],
+  "魔界ノりりむ": [
+    "Makaino Ririmu"
+  ],
+  "麻布麻衣": [
+    "Mai Azabu"
+  ],
+  "湊あくあ": [
+    "Minato Aqua"
+  ],
+  "夢月ロア": [
+    "Yuzuki Roa"
+  ],
+  "名取さな": [
+    "Natori Sana"
+  ],
+  "夜乃くろむ": [
+    "夜乃くろむ / Yano Kuromu"
+  ],
+  "矢澤にこ": [
+    "Nico Yazawa"
+  ],
+  "癒月ちょこ": [
+    "Yuzuki Choco"
+  ],
+  "優木せつ菜": [
+    "Setsuna Yuki"
+  ],
+  "幽谷霧子": [
+    "Kiriko Yukoku"
+  ],
+  "有栖川夏葉": [
+    "Natsuha Arisugawa"
+  ],
+  "有村麻央": [
+    "Arimura Mao",
+    "arimuramao",
+    "Mao Arimura"
+  ],
+  "夕霧綴理": [
+    "Tsuzuri Yugiri"
+  ],
+  "葉月恋": [
+    "Ren Hazuki"
+  ],
+  "嵐": [
+    "ARASHI"
+  ],
+  "嵐千砂都": [
+    "Chisato Arashi"
+  ],
+  "竜胆尊": [
+    "Rindou Mikoto"
+  ],
+  "鈴原るる": [
+    "Suzuhara Lulu"
+  ],
+  "鈴木羽那": [
+    "Hana Suzuki"
+  ],
+  "和泉愛依": [
+    "Mei Izumi"
+  ],
+  "戌亥とこ": [
+    "Inui Toko"
+  ],
+  "戌神ころね": [
+    "Inugami Korone"
+  ],
+  "櫻坂46": [
+    "Sakurazaka46"
+  ],
+  "櫻木真乃": [
+    "Mano Sakuragi"
+  ],
+  "欅坂46": [
+    "Keyakizaka46"
+  ],
+  "澁谷かのん": [
+    "Kanon Shibuya"
+  ],
+  "莉犬": [
+    "Rinu"
+  ],
+  "μ's": []
 }

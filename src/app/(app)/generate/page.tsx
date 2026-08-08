@@ -44,12 +44,12 @@ export default async function GeneratePage({
 
       {!hasSelection ? (
         <div className="mt-6 space-y-4">
-          <p className="text-[#1a1612]/70">
+          <p className="text-[#e8dfd0]/70">
             気分が選ばれていません。ホームから選び直してください。
           </p>
           <Link
             href="/"
-            className="inline-block text-sm text-[#2a6f6a] underline-offset-2 hover:underline"
+            className="inline-block text-sm text-[#c9a66b] underline-offset-2 hover:underline"
           >
             ホームに戻る
           </Link>

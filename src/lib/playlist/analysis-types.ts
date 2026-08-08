@@ -9,6 +9,25 @@ export type SimilarArtistPair = {
   similarity: number;
 };
 
+/** 候補の採用根拠（UI表示用） */
+export type ArtistAdoptedBy =
+  | "alias"
+  | "channel"
+  | "high"
+  | "multi"
+  | "confirm"
+  | "group"
+  | "unit"
+  | "unknown";
+
+export type ArtistEvidence = {
+  name: string;
+  sampleTitle: string | null;
+  sampleChannel: string | null;
+  occurrenceCount: number;
+  adoptedBy: ArtistAdoptedBy;
+};
+
 export type PlaylistAnalysis = {
   playlistIds: string[];
   playlistTitles: string[];
@@ -18,6 +37,8 @@ export type PlaylistAnalysis = {
   unclassifiedArtists?: UnclassifiedArtist[];
   /** 「もしかして同じ？」候補 */
   similarPairs?: SimilarArtistPair[];
+  /** 候補ごとの由来（曲名・チャンネル・採用理由） */
+  artistEvidence?: ArtistEvidence[];
   channels: string[];
   sampleTitles: string[];
   videoIds: string[];
@@ -29,4 +50,6 @@ export type YoutubePlaylistSummary = {
   title: string;
   itemCount: number;
   thumbnailUrl: string | null;
+  /** mine: 自分が作成 / saved: URL 登録した他人の PL */
+  source?: "mine" | "saved";
 };

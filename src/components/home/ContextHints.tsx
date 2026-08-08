@@ -103,19 +103,14 @@ export function ContextHints({
   }, [enabled, considerWeather, buildSuggestions, onApply]);
 
   useEffect(() => {
-    if (!enabled) {
-      setStatus("idle");
-      setWeather(null);
-      setSuggested([]);
-      setMessage(null);
-      return;
-    }
+    if (!enabled) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- weather detect on enable
     void detect();
   }, [enabled, detect]);
 
   if (!enabled) {
     return (
-      <p className="text-xs text-[#1a1612]/45">
+      <p className="text-xs text-[#e8dfd0]/45">
         天気・季節・時間帯の自動反映は設定で ON にできます。
         <Link href="/settings" className="ml-1 underline underline-offset-2">
           設定を開く
@@ -129,20 +124,20 @@ export function ContextHints({
     .join("・");
 
   return (
-    <div className="rounded-2xl border border-[#1a1612]/10 bg-white/70 px-4 py-3 text-sm">
+    <div className="rounded-2xl border border-[#e8dfd0]/10 bg-[#14161c]/85 px-4 py-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="font-medium text-[#1a1612]/80">いまの環境（自動）</p>
+        <p className="font-medium text-[#e8dfd0]/80">いまの環境（自動）</p>
         <button
           type="button"
           onClick={() => void detect()}
-          className="text-xs text-[#2a6f6a] underline-offset-2 hover:underline"
+          className="text-xs text-[#c9a66b] underline-offset-2 hover:underline"
         >
           再取得
         </button>
       </div>
 
       {status === "locating" || status === "loading" ? (
-        <p className="mt-2 text-xs text-[#1a1612]/50">
+        <p className="mt-2 text-xs text-[#e8dfd0]/50">
           {status === "locating"
             ? "位置情報を取得中…"
             : "天気を取得中…"}
@@ -150,13 +145,13 @@ export function ContextHints({
       ) : null}
 
       {weather ? (
-        <p className="mt-2 text-[#1a1612]/70">
+        <p className="mt-2 text-[#e8dfd0]/70">
           {weather.label} {Math.round(weather.temperatureC)}℃
         </p>
       ) : null}
 
       {suggested.length > 0 ? (
-        <p className="mt-1 text-xs text-[#1a1612]/55">
+        <p className="mt-1 text-xs text-[#e8dfd0]/55">
           反映候補: {labelText}（環境チップに自動選択済み。手動で外せます）
         </p>
       ) : null}

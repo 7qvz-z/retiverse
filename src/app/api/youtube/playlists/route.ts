@@ -5,6 +5,12 @@ import {
 } from "@/lib/youtube/api";
 import { createClient } from "@/lib/supabase/server";
 import type { TrackCandidate } from "@/lib/playlist/terms";
+import { mapYouTubeApiErrorMessage } from "@/lib/setup-options";
+import {
+  getYouTubeAccessToken,
+  YOUTUBE_TOKEN_MISSING_MESSAGE,
+} from "@/lib/youtube/auth";
+import { APP_NAME } from "@/lib/constants";
 
 type Body = {
   title?: string;
@@ -22,12 +28,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "ログインが必要です" }, { status: 401 });
   }
 
-  const accessToken = session.provider_token;
+  let accessToken: string | null;
+  try {
+    accessToken = await getYouTubeAccessToken(supabase, session);
+  } catch (e) {
+    return NextResponse.json(
+      {
+        error:
+          e instanceof Error ? e.message : YOUTUBE_TOKEN_MISSING_MESSAGE,
+      },
+      { status: 500 },
+    );
+  }
   if (!accessToken) {
     return NextResponse.json(
       {
         error:
-          "YouTube への書き込み権限がありません。初回設定から YouTube 連携をやり直してください。",
+          "YouTube への書き込み権限がありません。設定から YouTube 連携をやり直してください。",
       },
       { status: 400 },
     );
@@ -37,7 +54,7 @@ export async function POST(request: Request) {
   const tracks = body.tracks ?? [];
   const title =
     body.title?.trim() ||
-    `リテイバース ${new Date().toLocaleString("ja-JP")}`;
+    `${APP_NAME} ${new Date().toLocaleString("ja-JP")}`;
 
   if (tracks.length === 0) {
     return NextResponse.json({ error: "曲がありません" }, { status: 400 });
@@ -54,13 +71,19 @@ export async function POST(request: Request) {
     const playlistId = await createYouTubePlaylist(
       accessToken,
       title,
-      "リテイバースで自動生成されたプレイリスト",
+      `${APP_NAME} で自動生成されたプレイリスト`,
+      { userId: session.user.id },
     );
 
     const failed: string[] = [];
     for (const track of tracks) {
       try {
-        await addVideoToPlaylist(accessToken, playlistId, track.videoId);
+        await addVideoToPlaylist(
+          accessToken,
+          playlistId,
+          track.videoId,
+          { userId: session.user.id },
+        );
       } catch {
         failed.push(track.videoId);
       }
@@ -95,13 +118,12 @@ export async function POST(request: Request) {
       failedCount: failed.length,
     });
   } catch (error) {
+    const raw =
+      error instanceof Error
+        ? error.message
+        : "YouTubeへの追加に失敗しました";
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "YouTubeへの追加に失敗しました",
-      },
+      { error: mapYouTubeApiErrorMessage(raw) },
       { status: 502 },
     );
   }
